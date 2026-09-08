@@ -3,7 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Weekly Task Calendar</title>
+<title>Weekly Planner</title>
+<meta name="theme-color" content="#202020" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Weekly Planner">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -344,6 +352,7 @@
     outline: none;
     font-size: 13px;
     line-height: 1.35;
+    font-family: inherit;
   }
   .notes:focus { border-color: var(--blue); }
   .notes-hint {
@@ -605,6 +614,8 @@
 #authGate{position:fixed;inset:0;z-index:99999;background:#f7f5f0;display:flex;align-items:center;justify-content:center;padding:24px;font-family:inherit}
 .auth-card{width:min(420px,100%);background:white;border:1px solid #ddd7ce;border-radius:18px;padding:28px;box-shadow:0 16px 50px rgba(0,0,0,.12)}
 .auth-card h2{margin:0 0 8px;font-size:24px}.auth-card p{margin:0 0 18px;color:#6b665f;line-height:1.45}.auth-card input{box-sizing:border-box;width:100%;font-size:16px;padding:12px 14px;margin:6px 0;border:1px solid #cbc5bc;border-radius:10px}.auth-card button{width:100%;margin-top:10px;padding:12px;border:0;border-radius:10px;background:#222;color:#fff;font-weight:700;font-size:15px;cursor:pointer}.auth-error{min-height:20px;color:#b42318;font-size:13px;margin-top:8px}.sync-pill{position:fixed;right:12px;bottom:12px;z-index:5000;background:rgba(255,255,255,.92);border:1px solid #ddd7ce;border-radius:999px;padding:6px 10px;font-size:11px;color:#6b665f;box-shadow:0 3px 12px rgba(0,0,0,.08)}
+.utility-wrap{position:relative}.utility-menu{position:absolute;right:0;top:calc(100% + 8px);width:210px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);padding:6px;z-index:1000}.utility-menu button{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--text);padding:10px 11px;border-radius:7px;font:inherit;cursor:pointer}.utility-menu button:hover{background:var(--surface2)}.utility-menu .danger{color:var(--red)}
+@media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
 <body>
@@ -641,6 +652,16 @@
   </div>
   <button class="btn primary" id="addTaskBtn">+ Add Task</button>
   <button class="btn" id="toggleSidebar" title="Long-term tasks">📋 Backlog</button>
+  <div class="utility-wrap">
+    <button class="btn icon-only" id="utilityBtn" title="Calendar options" aria-label="Calendar options">⋯</button>
+    <div class="utility-menu" id="utilityMenu" style="display:none">
+      <button id="refreshCloud">↻ Refresh from cloud</button>
+      <button id="exportBackup">↓ Download backup</button>
+      <button id="importBackup">↑ Restore backup</button>
+      <button class="danger" id="signOutBtn">Sign out</button>
+    </div>
+  </div>
+  <input type="file" id="backupFile" accept="application/json,.json" style="display:none">
 </div>
 
 <!-- MAIN -->
@@ -727,16 +748,15 @@ const SUPABASE_URL = 'https://yfvvulyoqfqajcgmnbps.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_lLkXO8vRNDzabKb6-Ra7FQ_LcpHonj1';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 let cloudUser = null, cloudReady = false, syncTimer = null, syncing = false;
-function snapshotState(){ return {tasks,statuses,notes,longTasks,ratings,calendarView,version:1}; }
+function snapshotState(){ return {tasks,statuses,notes,longTasks,ratings,version:2}; }
 function applyCloudState(d){
   if(!d || typeof d !== 'object') return;
   if(Array.isArray(d.tasks)) tasks=d.tasks;
   if(d.statuses) statuses=d.statuses; if(d.notes) notes=d.notes;
   if(Array.isArray(d.longTasks)) longTasks=d.longTasks; if(d.ratings) ratings=d.ratings;
-  if(d.calendarView==='day'||d.calendarView==='week') calendarView=d.calendarView;
   localStorage.setItem(TASKS_KEY,JSON.stringify(tasks)); localStorage.setItem(STATUS_KEY,JSON.stringify(statuses));
   localStorage.setItem(NOTES_KEY,JSON.stringify(notes)); localStorage.setItem(LONG_KEY,JSON.stringify(longTasks));
-  localStorage.setItem(RATINGS_KEY,JSON.stringify(ratings)); localStorage.setItem(VIEW_KEY,calendarView);
+  localStorage.setItem(RATINGS_KEY,JSON.stringify(ratings));
 }
 function setSyncText(t){ const el=document.getElementById('syncPill'); if(el){el.style.display='block';el.textContent=t;} }
 function scheduleCloudSync(){ if(!cloudReady||!cloudUser) return; clearTimeout(syncTimer); syncTimer=setTimeout(pushCloudState,350); }
@@ -857,7 +877,7 @@ let statuses = loadStatuses();
 let notes = loadNotes();
 let longTasks = loadLong();
 let ratings = loadRatings();
-let calendarView = localStorage.getItem(VIEW_KEY) || 'week';
+let calendarView = localStorage.getItem(VIEW_KEY) || (window.matchMedia('(max-width: 700px)').matches ? 'day' : 'week');
 let selectedDay = new Date();
 let currentMonday = weekStart(new Date());
 let pickerTarget = null; // { taskId, dateStr }
@@ -943,6 +963,19 @@ function render() {
   }
 
   renderLongTasks();
+}
+
+function deleteTask(taskId) {
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+  tasks = tasks.filter(t => t.id !== taskId);
+  Object.keys(statuses).forEach(k => { if (k.startsWith(taskId + '_')) delete statuses[k]; });
+  Object.keys(notes).forEach(k => { if (k.startsWith(taskId + '_')) delete notes[k]; });
+  saveTasks(tasks);
+  saveStatuses(statuses);
+  saveNotes(notes);
+  closePicker();
+  render();
 }
 
 function renderLongTasks() {
@@ -1114,13 +1147,13 @@ document.getElementById('saveTask').addEventListener('click', () => {
 // ── VIEW TOGGLE ───────────────────────────────────────────────────
 document.getElementById('weekViewBtn').addEventListener('click', () => {
   calendarView = 'week';
-  localStorage.setItem(VIEW_KEY, calendarView); scheduleCloudSync();
+  localStorage.setItem(VIEW_KEY, calendarView);
   currentMonday = weekStart(selectedDay);
   render();
 });
 document.getElementById('dayViewBtn').addEventListener('click', () => {
   calendarView = 'day';
-  localStorage.setItem(VIEW_KEY, calendarView); scheduleCloudSync();
+  localStorage.setItem(VIEW_KEY, calendarView);
   // Open Day view on today when switching from Week view.
   selectedDay = new Date();
   currentMonday = weekStart(selectedDay);
@@ -1166,6 +1199,43 @@ function addLong() {
   document.getElementById('longTaskInput').value = '';
   renderLongTasks();
 }
+
+// ── CLOUD / BACKUP UTILITIES ─────────────────────────────────────
+async function pullCloudState(showStatus=true) {
+  if (!cloudUser) return;
+  if (showStatus) setSyncText('Refreshing…');
+  const {data,error}=await sb.from('calendar_state').select('data').eq('user_id',cloudUser.id).maybeSingle();
+  if (error) { setSyncText('Sync error'); console.error(error); return; }
+  if (data?.data) { applyCloudState(data.data); render(); renderLongTasks(); }
+  setSyncText(navigator.onLine ? 'Synced' : 'Offline');
+}
+function downloadBackup(){
+  const payload={exportedAt:new Date().toISOString(),calendar:snapshotState()};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='weekly-planner-backup-'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+async function restoreBackup(file){
+  try{
+    const raw=JSON.parse(await file.text()); const d=raw.calendar||raw;
+    if(!d || !Array.isArray(d.tasks)) throw new Error('This does not look like a Weekly Planner backup.');
+    applyCloudState(d); render(); renderLongTasks(); await pushCloudState();
+  }catch(e){ alert('Could not restore backup: '+e.message); }
+}
+const utilityBtn=document.getElementById('utilityBtn'), utilityMenu=document.getElementById('utilityMenu');
+utilityBtn.addEventListener('click',e=>{e.stopPropagation();utilityMenu.style.display=utilityMenu.style.display==='none'?'block':'none';});
+document.addEventListener('click',e=>{if(!utilityMenu.contains(e.target)&&e.target!==utilityBtn)utilityMenu.style.display='none';});
+document.getElementById('refreshCloud').addEventListener('click',()=>{utilityMenu.style.display='none';pullCloudState();});
+document.getElementById('exportBackup').addEventListener('click',()=>{utilityMenu.style.display='none';downloadBackup();});
+document.getElementById('importBackup').addEventListener('click',()=>{utilityMenu.style.display='none';document.getElementById('backupFile').click();});
+document.getElementById('backupFile').addEventListener('change',e=>{if(e.target.files[0])restoreBackup(e.target.files[0]);e.target.value='';});
+document.getElementById('signOutBtn').addEventListener('click',async()=>{utilityMenu.style.display='none';await sb.auth.signOut();cloudUser=null;cloudReady=false;document.getElementById('authGate').style.display='flex';document.getElementById('syncPill').style.display='none';});
+window.addEventListener('online',()=>pullCloudState(false));
+window.addEventListener('offline',()=>setSyncText('Offline'));
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloudReady&&navigator.onLine)pullCloudState(false);});
+window.addEventListener('focus',()=>{if(cloudReady&&navigator.onLine)pullCloudState(false);});
+if('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(console.warn));
 
 // ── INIT ─────────────────────────────────────────────────────────
 render();
