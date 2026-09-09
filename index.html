@@ -195,6 +195,14 @@
     user-select: none;
   }
   .task-card:hover { transform: translateY(-1px); box-shadow: var(--shadow); }
+
+  /* One-off tasks are intentionally more prominent than recurring tasks. */
+  .task-card.one-off {
+    border-width: 3px;
+  }
+  .task-card.one-off .task-name {
+    font-weight: 750;
+  }
   .task-card.status-not-started {
     background: var(--red-soft);
     border-color: var(--red);
@@ -937,7 +945,7 @@ function render() {
         const statusKey = t.id + '_' + dateStr;
         const status = statuses[statusKey] || 'not-started';
         const card = document.createElement('div');
-        card.className = 'task-card status-' + status;
+        card.className = 'task-card status-' + status + (t.type === 'one-off' ? ' one-off' : '');
         card.dataset.taskId = t.id;
         card.dataset.date = dateStr;
         card.innerHTML = `
@@ -969,6 +977,14 @@ function deleteTask(taskId) {
   const task = tasks.find(t => t.id === taskId);
   if (!task) return;
   tasks = tasks.filter(t => t.id !== taskId);
+
+  // Close any numbering gaps left by the deleted task.
+  // Example: deleting #14 turns #15, #16, ... into #14, #15, ...
+  tasks = tasks.map(t => ({
+    ...t,
+    order: t.order > task.order ? t.order - 1 : t.order
+  })).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+
   Object.keys(statuses).forEach(k => { if (k.startsWith(taskId + '_')) delete statuses[k]; });
   Object.keys(notes).forEach(k => { if (k.startsWith(taskId + '_')) delete notes[k]; });
   saveTasks(tasks);

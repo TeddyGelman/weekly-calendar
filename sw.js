@@ -1,4 +1,4 @@
-const CACHE='weekly-planner-v2';
+const CACHE='weekly-planner-v3';
 const CORE=['./','./index.html','./manifest.webmanifest','./icon-180.png','./icon-512.png','https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>Promise.allSettled(CORE.map(u=>c.add(u))))));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k))))));
