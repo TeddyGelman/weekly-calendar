@@ -791,7 +791,7 @@ const SUPABASE_URL = 'https://yfvvulyoqfqajcgmnbps.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_lLkXO8vRNDzabKb6-Ra7FQ_LcpHonj1';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 let cloudUser = null, cloudReady = false, syncTimer = null, syncing = false;
-function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,version:6}}
+function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,version:7}}
 function applyCloudState(d){
   if(!d || typeof d !== 'object') return;
   if(Array.isArray(d.tasks)) tasks=d.tasks;
@@ -877,9 +877,11 @@ function saveRatings(r){localStorage.setItem(RATINGS_KEY,JSON.stringify(r));sche
 function loadDueDates(){try{return JSON.parse(localStorage.getItem(DUE_KEY)||'{}')}catch{return {}}}
 function saveDueDates(d){
   localStorage.setItem(DUE_KEY,JSON.stringify(d));
-  // Persist the complete current state; the cloud sync is debounced but local UI
-  // remains authoritative until it completes.
-  scheduleCloudSync();
+  localRevision++;
+  if(cloudReady&&cloudUser&&navigator.onLine){
+    clearTimeout(syncTimer);
+    syncTimer=setTimeout(pushCloudState,80);
+  }
 }
 function loadBacklogSections(){try{return JSON.parse(localStorage.getItem(BACKLOG_SECTIONS_KEY)||'null')||[{id:'general',name:'General'}]}catch{return [{id:'general',name:'General'}]}}
 function saveBacklogSections(x){localStorage.setItem(BACKLOG_SECTIONS_KEY,JSON.stringify(x));scheduleCloudSync()}
@@ -1002,7 +1004,7 @@ function render() {
     `;
 
     renderDueItems(col,dateStr);
-    col.querySelector('.due-add').addEventListener('click',()=>addDueItem(dateStr));
+    col.querySelector('.due-add').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();addDueItem(dateStr);});
     const list = col.querySelector('.tasks-list');
 
     if (dayTasks.length === 0) {
@@ -1093,6 +1095,11 @@ function renderDueItems(col,dateStr){
     row.innerHTML=`<span class="due-dot" title="Change color"></span><input class="due-item-edit" value="${escHtml(item.text)}" placeholder="Type what is due…" aria-label="Due item"><button class="due-item-del" type="button" aria-label="Delete due item">&times;</button>`;
     const input=row.querySelector('.due-item-edit');
     row.querySelector('.due-dot').onclick=e=>{e.stopPropagation();showDueColorPicker(e.currentTarget,dateStr,item.id)};
+    input.addEventListener('click',e=>e.stopPropagation());
+    input.addEventListener('keydown',e=>{
+      e.stopPropagation();
+      if(e.key==='Enter'){e.preventDefault();input.blur();}
+    });
     input.addEventListener('input',()=>{
       item.text=input.value;
       saveDueDates(dueDates);
@@ -1414,10 +1421,15 @@ document.getElementById('exportBackup').addEventListener('click',()=>{utilityMen
 document.getElementById('importBackup').addEventListener('click',()=>{utilityMenu.style.display='none';document.getElementById('backupFile').click();});
 document.getElementById('backupFile').addEventListener('change',e=>{if(e.target.files[0])restoreBackup(e.target.files[0]);e.target.value='';});
 document.getElementById('signOutBtn').addEventListener('click',async()=>{utilityMenu.style.display='none';await sb.auth.signOut();cloudUser=null;cloudReady=false;document.getElementById('authGate').style.display='flex';document.getElementById('syncPill').style.display='none';});
-window.addEventListener('online',()=>pullCloudState(false));
+window.addEventListener('online',()=>{
+  setSyncText('Online');
+  if(localRevision>syncedRevision) pushCloudState();
+});
 window.addEventListener('offline',()=>setSyncText('Offline'));
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&cloudReady&&navigator.onLine)pullCloudState(false);});
-window.addEventListener('focus',()=>{if(cloudReady&&navigator.onLine)pullCloudState(false);});
+// Do not auto-pull on focus/visibility. Those events fire while users are
+// interacting with editable controls and can replace fresh local edits with an
+// older cloud snapshot. Saves still sync automatically, and explicit refresh
+// / page load still pulls cloud state.
 if('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(console.warn));
 
 // ── INIT ─────────────────────────────────────────────────────────
