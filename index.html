@@ -212,7 +212,11 @@
   }
 
   /* ── TASK CARD ── */
+  .task-reorder{display:flex;flex-direction:column;gap:0;margin-right:2px;align-self:center}
+  .task-move{border:0;background:transparent;color:var(--text2);font-size:10px;line-height:10px;padding:1px 3px;cursor:pointer;opacity:.65}
+  .task-move:hover{opacity:1}
   .task-card {
+
     border-radius: 6px;
     border: 1.5px solid transparent;
     padding: 7px 9px;
@@ -660,7 +664,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v16-safe</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v17-reorder</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -791,7 +795,7 @@ const SUPABASE_URL = 'https://yfvvulyoqfqajcgmnbps.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_lLkXO8vRNDzabKb6-Ra7FQ_LcpHonj1';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 let cloudUser = null, cloudReady = false, syncTimer = null, syncing = false;
-function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,version:8}}
+function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,dayOrders,version:8}}
 function applyCloudState(d){
   if(!d || typeof d !== 'object') return;
   if(Array.isArray(d.tasks)) tasks=d.tasks;
@@ -800,6 +804,7 @@ function applyCloudState(d){
   localStorage.setItem(TASKS_KEY,JSON.stringify(tasks)); localStorage.setItem(STATUS_KEY,JSON.stringify(statuses));
   localStorage.setItem(NOTES_KEY,JSON.stringify(notes)); localStorage.setItem(LONG_KEY,JSON.stringify(longTasks));
   localStorage.setItem(RATINGS_KEY,JSON.stringify(ratings)); localStorage.setItem(DUE_KEY,JSON.stringify(dueDates)); localStorage.setItem(BACKLOG_SECTIONS_KEY,JSON.stringify(backlogSections));
+  if(d.dayOrders && typeof d.dayOrders==='object'){dayOrders=d.dayOrders;localStorage.setItem(DAY_ORDER_KEY,JSON.stringify(dayOrders));}
 }
 function setSyncText(t){ const el=document.getElementById('syncPill'); if(el){el.style.display='block';el.textContent=t;} }
 let localRevision=0, syncedRevision=0;
@@ -851,6 +856,11 @@ const LONG_KEY = 'wc_long_v2';
 const RATINGS_KEY = 'wc_ratings_v1';
 const DUE_KEY='wc_due_v1'; const BACKLOG_SECTIONS_KEY='wc_backlog_sections_v1';
 const VIEW_KEY = 'wc_view_v1';
+const DAY_ORDER_KEY = 'wc_day_order_v1';
+
+function loadDayOrders(){try{return JSON.parse(localStorage.getItem(DAY_ORDER_KEY)||'{}')}catch{return {}}}
+function saveDayOrders(v){localStorage.setItem(DAY_ORDER_KEY,JSON.stringify(v));scheduleCloudSync();}
+let dayOrders=loadDayOrders();
 
 function loadTasks() {
   try { return JSON.parse(localStorage.getItem(TASKS_KEY) || 'null') || defaultTasks(); }
@@ -954,6 +964,24 @@ let currentMonday = weekStart(new Date());
 let pickerTarget = null; // { taskId, dateStr }
 
 // ── RENDER ───────────────────────────────────────────────────────
+function moveTaskOnDate(taskId,dateStr,delta){
+  const visible=tasks.filter(t=>t.type==='recurring'||(t.type==='one-off'&&t.date===dateStr))
+    .sort((a,b)=>{
+      const seq=dayOrders[dateStr];
+      if(Array.isArray(seq)){
+        const ai=seq.indexOf(a.id),bi=seq.indexOf(b.id);
+        if(ai!==-1||bi!==-1){if(ai===-1)return 1;if(bi===-1)return -1;return ai-bi;}
+      }
+      return a.order-b.order||a.name.localeCompare(b.name);
+    });
+  const i=visible.findIndex(t=>t.id===taskId); if(i<0)return;
+  const j=i+delta; if(j<0||j>=visible.length)return;
+  [visible[i],visible[j]]=[visible[j],visible[i]];
+  dayOrders[dateStr]=visible.map(t=>t.id);
+  saveDayOrders(dayOrders);
+  render();
+}
+
 function render() {
   document.getElementById('weekLabel').textContent = calendarView === 'day' ? (DAY_NAMES[(selectedDay.getDay()+6)%7] + ', ' + MONTHS[selectedDay.getMonth()] + ' ' + selectedDay.getDate() + ', ' + selectedDay.getFullYear()) : fmtWeekLabel(currentMonday);
   document.getElementById('weekViewBtn').classList.toggle('active', calendarView === 'week');
@@ -984,7 +1012,18 @@ function render() {
         }
         return false;
       })
-      .sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+      .sort((a,b)=>{
+        const seq=dayOrders[dateStr];
+        if(Array.isArray(seq)){
+          const ai=seq.indexOf(a.id), bi=seq.indexOf(b.id);
+          if(ai!==-1 || bi!==-1){
+            if(ai===-1)return 1;
+            if(bi===-1)return -1;
+            return ai-bi;
+          }
+        }
+        return a.order-b.order || a.name.localeCompare(b.name);
+      });
 
     const col = document.createElement('div');
     col.className = 'day-col' + (isToday ? ' today' : '') + (isPast ? ' past' : '') + (isFuture ? ' future' : '');
@@ -1020,6 +1059,10 @@ function render() {
         card.dataset.taskId = t.id;
         card.dataset.date = dateStr;
         card.innerHTML = `
+          <div class="task-reorder">
+            <button class="task-move move-up" type="button" title="Move up" aria-label="Move task up">▲</button>
+            <button class="task-move move-down" type="button" title="Move down" aria-label="Move task down">▼</button>
+          </div>
           <div class="task-dot"></div>
           <div class="task-info">
             <div class="task-name">${escHtml(t.name)}</div>
@@ -1028,6 +1071,8 @@ function render() {
           ${t.type === 'one-off' ? '<div class="task-type-badge">one-off</div>' : ''}
           <button class="task-delete" title="Delete task" aria-label="Delete task">&times;</button>
         `;
+        card.querySelector('.move-up').addEventListener('click',e=>{e.stopPropagation();moveTaskOnDate(t.id,dateStr,-1);});
+        card.querySelector('.move-down').addEventListener('click',e=>{e.stopPropagation();moveTaskOnDate(t.id,dateStr,1);});
         card.addEventListener('click', (e) => openPicker(e, t.id, dateStr));
         card.querySelector('.task-delete').addEventListener('click', (e) => { e.stopPropagation(); deleteTask(t.id); });
         list.appendChild(card);
