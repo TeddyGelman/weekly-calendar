@@ -212,6 +212,9 @@
   }
 
   /* ── TASK CARD ── */
+  .task-card.calendar-draggable{cursor:grab}
+  .task-card.calendar-draggable.dragging{opacity:.42}
+  .task-card.calendar-draggable.drag-over{outline:2px dashed var(--accent);outline-offset:2px}
   .task-reorder{display:flex;flex-direction:column;gap:0;margin-right:2px;align-self:center}
   .task-move{border:0;background:transparent;color:var(--text2);font-size:10px;line-height:10px;padding:1px 3px;cursor:pointer;opacity:.65}
   .task-move:hover{opacity:1}
@@ -664,7 +667,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v17-reorder</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v19-drag-manual</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -765,6 +768,14 @@
 <div class="status-picker" id="statusPicker" style="display:none">
   <div class="status-picker-title" id="pickerTitle">Set Status</div>
   <div class="notes-wrap"><div class="notes-label">Task title</div><input class="notes" id="taskTitleEdit" style="min-height:0;resize:none"><div class="notes-hint">Saved automatically.</div></div>
+  <div class="notes-wrap">
+    <div class="notes-label">Position on this day</div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input class="notes" id="taskPositionEdit" type="number" min="1" step="1" style="min-height:0;resize:none;width:72px" aria-label="Task position">
+      <button class="btn" id="taskPositionApply" type="button" style="padding:5px 9px;font-size:11px">Move</button>
+    </div>
+    <div class="notes-hint">Type a number, e.g. 3, to move this task to #3 on this date.</div>
+  </div>
   <div class="status-option" data-status="not-started">
     <div class="dot" style="background:var(--red)"></div> Not Started
   </div>
@@ -982,6 +993,48 @@ function moveTaskOnDate(taskId,dateStr,delta){
   render();
 }
 
+function dragTaskOnDate(movingId,targetId,dateStr,placeAfter=false){
+  const visible=tasks.filter(t=>t.type==='recurring'||(t.type==='one-off'&&t.date===dateStr))
+    .sort((a,b)=>{
+      const seq=dayOrders[dateStr];
+      if(Array.isArray(seq)){
+        const ai=seq.indexOf(a.id),bi=seq.indexOf(b.id);
+        if(ai!==-1||bi!==-1){if(ai===-1)return 1;if(bi===-1)return -1;return ai-bi;}
+      }
+      return a.order-b.order||a.name.localeCompare(b.name);
+    });
+  const moving=visible.find(t=>t.id===movingId); if(!moving)return;
+  const rest=visible.filter(t=>t.id!==movingId);
+  let j=rest.findIndex(t=>t.id===targetId);
+  if(j<0)j=rest.length; else if(placeAfter)j++;
+  rest.splice(j,0,moving);
+  dayOrders[dateStr]=rest.map(t=>t.id);
+  saveDayOrders(dayOrders);
+  render();
+}
+
+
+function setTaskPositionOnDate(taskId,dateStr,position){
+  const visible=tasks.filter(t=>t.type==='recurring'||(t.type==='one-off'&&t.date===dateStr))
+    .sort((a,b)=>{
+      const seq=dayOrders[dateStr];
+      if(Array.isArray(seq)){
+        const ai=seq.indexOf(a.id),bi=seq.indexOf(b.id);
+        if(ai!==-1||bi!==-1){if(ai===-1)return 1;if(bi===-1)return -1;return ai-bi;}
+      }
+      return a.order-b.order||a.name.localeCompare(b.name);
+    });
+  const moving=visible.find(t=>t.id===taskId); if(!moving)return;
+  const rest=visible.filter(t=>t.id!==taskId);
+  let pos=Math.round(Number(position));
+  if(!Number.isFinite(pos))return;
+  pos=Math.max(1,Math.min(visible.length,pos));
+  rest.splice(pos-1,0,moving);
+  dayOrders[dateStr]=rest.map(t=>t.id);
+  saveDayOrders(dayOrders);
+  render();
+}
+
 function render() {
   document.getElementById('weekLabel').textContent = calendarView === 'day' ? (DAY_NAMES[(selectedDay.getDay()+6)%7] + ', ' + MONTHS[selectedDay.getMonth()] + ' ' + selectedDay.getDate() + ', ' + selectedDay.getFullYear()) : fmtWeekLabel(currentMonday);
   document.getElementById('weekViewBtn').classList.toggle('active', calendarView === 'week');
@@ -1047,6 +1100,16 @@ function render() {
     renderDueItems(col,dateStr);
     col.querySelector('.due-add').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();addDueItem(dateStr);});
     const list = col.querySelector('.tasks-list');
+    list.addEventListener('dragover',e=>e.preventDefault());
+    list.addEventListener('drop',e=>{
+      if(e.target.closest('.task-card'))return;
+      e.preventDefault();
+      let d; try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}
+      if(!d || d.dateStr!==dateStr)return;
+      const visible=dayTasks.filter(t=>t.id!==d.taskId);
+      const last=visible[visible.length-1];
+      if(last)dragTaskOnDate(d.taskId,last.id,dateStr,true);
+    });
 
     if (dayTasks.length === 0) {
       list.innerHTML = '<div class="empty-col">No tasks</div>';
@@ -1058,6 +1121,8 @@ function render() {
         card.className = 'task-card status-' + status + (t.type === 'one-off' ? ' one-off' : '');
         card.dataset.taskId = t.id;
         card.dataset.date = dateStr;
+        card.classList.add('calendar-draggable');
+        card.draggable = true;
         card.innerHTML = `
           <div class="task-reorder">
             <button class="task-move move-up" type="button" title="Move up" aria-label="Move task up">▲</button>
@@ -1071,6 +1136,30 @@ function render() {
           ${t.type === 'one-off' ? '<div class="task-type-badge">one-off</div>' : ''}
           <button class="task-delete" title="Delete task" aria-label="Delete task">&times;</button>
         `;
+        card.addEventListener('dragstart',e=>{
+          // Buttons remain clickable without accidentally beginning a drag.
+          if(e.target.closest('button')){e.preventDefault();return;}
+          card.classList.add('dragging');
+          e.dataTransfer.effectAllowed='move';
+          e.dataTransfer.setData('text/plain',JSON.stringify({taskId:t.id,dateStr}));
+        });
+        card.addEventListener('dragend',()=>{
+          card.classList.remove('dragging');
+          document.querySelectorAll('.task-card.drag-over').forEach(x=>x.classList.remove('drag-over'));
+        });
+        card.addEventListener('dragover',e=>{
+          e.preventDefault();
+          if(!card.classList.contains('dragging'))card.classList.add('drag-over');
+          e.dataTransfer.dropEffect='move';
+        });
+        card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));
+        card.addEventListener('drop',e=>{
+          e.preventDefault(); e.stopPropagation(); card.classList.remove('drag-over');
+          let d; try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}
+          if(!d || d.dateStr!==dateStr || d.taskId===t.id)return;
+          const r=card.getBoundingClientRect();
+          dragTaskOnDate(d.taskId,t.id,dateStr,e.clientY > r.top+r.height/2);
+        });
         card.querySelector('.move-up').addEventListener('click',e=>{e.stopPropagation();moveTaskOnDate(t.id,dateStr,-1);});
         card.querySelector('.move-down').addEventListener('click',e=>{e.stopPropagation();moveTaskOnDate(t.id,dateStr,1);});
         card.addEventListener('click', (e) => openPicker(e, t.id, dateStr));
@@ -1215,6 +1304,17 @@ function normalizeBacklog(){backlogSections.forEach(s=>longTasks.filter(t=>t.sec
 function openPicker(e, taskId, dateStr) {
   e.stopPropagation();
   pickerTarget = { taskId, dateStr };
+  const orderedForDate=tasks.filter(t=>t.type==='recurring'||(t.type==='one-off'&&t.date===dateStr))
+    .sort((a,b)=>{
+      const seq=dayOrders[dateStr];
+      if(Array.isArray(seq)){
+        const ai=seq.indexOf(a.id),bi=seq.indexOf(b.id);
+        if(ai!==-1||bi!==-1){if(ai===-1)return 1;if(bi===-1)return -1;return ai-bi;}
+      }
+      return a.order-b.order||a.name.localeCompare(b.name);
+    });
+  const positionInput=document.getElementById('taskPositionEdit');
+  positionInput.value=Math.max(1,orderedForDate.findIndex(t=>t.id===taskId)+1);
   const picker = document.getElementById('statusPicker');
 
   const statusKey = taskId + '_' + dateStr;
@@ -1267,6 +1367,16 @@ document.getElementById('taskNotes').addEventListener('input', (e) => {
   notesSaveTimer = setTimeout(() => saveNotes(notes), 200);
 });
 
+document.getElementById('taskPositionApply').addEventListener('click',e=>{
+  e.stopPropagation();
+  if(!pickerTarget)return;
+  setTaskPositionOnDate(pickerTarget.taskId,pickerTarget.dateStr,document.getElementById('taskPositionEdit').value);
+  closePicker();
+});
+document.getElementById('taskPositionEdit').addEventListener('keydown',e=>{
+  e.stopPropagation();
+  if(e.key==='Enter'){e.preventDefault();document.getElementById('taskPositionApply').click();}
+});
 document.getElementById('pickerDelete').addEventListener('click', () => {
   if (!pickerTarget) return;
   const { taskId } = pickerTarget;
