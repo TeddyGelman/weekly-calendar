@@ -212,11 +212,6 @@
   }
 
   /* ── TASK CARD ── */
-  .task-reorder{display:flex;flex-direction:column;gap:1px;margin-right:2px}
-  .task-move{border:0;background:transparent;color:var(--text2);font-size:12px;line-height:12px;padding:1px 3px;cursor:pointer}
-  .task-card[draggable="true"]{cursor:grab}
-  .task-card.dragging{opacity:.45}
-  .task-card.drag-over{outline:2px dashed var(--accent);outline-offset:2px}
   .task-card {
     border-radius: 6px;
     border: 1.5px solid transparent;
@@ -665,7 +660,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div id="buildBadge" style="position:absolute;right:8px;top:4px;font-size:9px;opacity:.4;z-index:5">v15</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v16-safe</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -796,7 +791,7 @@ const SUPABASE_URL = 'https://yfvvulyoqfqajcgmnbps.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_lLkXO8vRNDzabKb6-Ra7FQ_LcpHonj1';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 let cloudUser = null, cloudReady = false, syncTimer = null, syncing = false;
-function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,version:15}}
+function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,version:8}}
 function applyCloudState(d){
   if(!d || typeof d !== 'object') return;
   if(Array.isArray(d.tasks)) tasks=d.tasks;
@@ -959,32 +954,6 @@ let currentMonday = weekStart(new Date());
 let pickerTarget = null; // { taskId, dateStr }
 
 // ── RENDER ───────────────────────────────────────────────────────
-function visibleTasksForDate(dateStr){
-  return tasks.filter(t=>t.type!=='one-off'||t.date===dateStr)
-    .sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name));
-}
-function commitCalendarOrder(arr){
-  // Use wide integer spacing to make later one-off insertions stable.
-  arr.forEach((t,i)=>t.order=(i+1)*100);
-  saveTasks(tasks); render();
-}
-function moveCalendarTask(taskId,dateStr,delta){
-  const arr=visibleTasksForDate(dateStr);
-  const i=arr.findIndex(t=>t.id===taskId); if(i<0)return;
-  const j=Math.max(0,Math.min(arr.length-1,i+delta)); if(i===j)return;
-  [arr[i],arr[j]]=[arr[j],arr[i]];
-  commitCalendarOrder(arr);
-}
-function dragCalendarTask(movingId,targetId,dateStr){
-  const arr=visibleTasksForDate(dateStr);
-  const moving=arr.find(t=>t.id===movingId); if(!moving)return;
-  const rest=arr.filter(t=>t.id!==movingId);
-  let j=targetId?rest.findIndex(t=>t.id===targetId):rest.length;
-  if(j<0)j=rest.length;
-  rest.splice(j,0,moving);
-  commitCalendarOrder(rest);
-}
-
 function render() {
   document.getElementById('weekLabel').textContent = calendarView === 'day' ? (DAY_NAMES[(selectedDay.getDay()+6)%7] + ', ' + MONTHS[selectedDay.getMonth()] + ' ' + selectedDay.getDate() + ', ' + selectedDay.getFullYear()) : fmtWeekLabel(currentMonday);
   document.getElementById('weekViewBtn').classList.toggle('active', calendarView === 'week');
@@ -1050,12 +1019,7 @@ function render() {
         card.className = 'task-card status-' + status + (t.type === 'one-off' ? ' one-off' : '');
         card.dataset.taskId = t.id;
         card.dataset.date = dateStr;
-        card.draggable = true;
         card.innerHTML = `
-          <div class="task-reorder" aria-label="Reorder task">
-            <button class="task-move move-up" type="button" title="Move up">▲</button>
-            <button class="task-move move-down" type="button" title="Move down">▼</button>
-          </div>
           <div class="task-dot"></div>
           <div class="task-info">
             <div class="task-name">${escHtml(t.name)}</div>
@@ -1064,22 +1028,6 @@ function render() {
           ${t.type === 'one-off' ? '<div class="task-type-badge">one-off</div>' : ''}
           <button class="task-delete" title="Delete task" aria-label="Delete task">&times;</button>
         `;
-        card.querySelector('.move-up').addEventListener('click',e=>{e.stopPropagation();moveCalendarTask(t.id,dateStr,-1)});
-        card.querySelector('.move-down').addEventListener('click',e=>{e.stopPropagation();moveCalendarTask(t.id,dateStr,1)});
-        card.addEventListener('dragstart',e=>{
-          if(e.target.closest('button,input,textarea')){e.preventDefault();return;}
-          card.classList.add('dragging');
-          e.dataTransfer.effectAllowed='move';
-          e.dataTransfer.setData('text/plain',JSON.stringify({taskId:t.id,dateStr}));
-        });
-        card.addEventListener('dragend',()=>{card.classList.remove('dragging');document.querySelectorAll('.drag-over').forEach(x=>x.classList.remove('drag-over'))});
-        card.addEventListener('dragover',e=>{e.preventDefault();card.classList.add('drag-over')});
-        card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));
-        card.addEventListener('drop',e=>{
-          e.preventDefault();e.stopPropagation();card.classList.remove('drag-over');
-          let d;try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}
-          if(d&&d.dateStr===dateStr&&d.taskId!==t.id)dragCalendarTask(d.taskId,t.id,dateStr);
-        });
         card.addEventListener('click', (e) => openPicker(e, t.id, dateStr));
         card.querySelector('.task-delete').addEventListener('click', (e) => { e.stopPropagation(); deleteTask(t.id); });
         list.appendChild(card);
@@ -1484,9 +1432,7 @@ window.addEventListener('offline',()=>setSyncText('Offline'));
 // interacting with editable controls and can replace fresh local edits with an
 // older cloud snapshot. Saves still sync automatically, and explicit refresh
 // / page load still pulls cloud state.
-if('serviceWorker' in navigator){
-  window.addEventListener('load',()=>navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(console.warn));
-}
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.getRegistrations().then(rs=>rs.forEach(r=>r.unregister())).catch(()=>{}));}
 
 // ── INIT ─────────────────────────────────────────────────────────
 render();
