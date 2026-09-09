@@ -169,9 +169,29 @@
     line-height: 1.1;
     margin-top: 2px;
   }
-  .due-box{margin:0 8px 8px;padding:7px 9px;border:1px dashed var(--border);border-radius:8px;background:rgba(255,255,255,.025)}
-  .due-label{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);margin-bottom:4px}
-  .due-input{width:100%;min-height:30px;resize:vertical;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-size:12px;line-height:1.35;padding:0}
+  .due-box{margin:0 8px 8px;padding:7px 8px;border:1px dashed var(--border);border-radius:8px;background:rgba(255,255,255,.025)}
+  .due-head{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px}
+  .due-label{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text2)}
+  .due-add{border:1px solid var(--border);background:transparent;color:var(--text2);border-radius:6px;font:inherit;font-size:10px;padding:2px 6px;cursor:pointer}
+  .due-list{display:flex;flex-direction:column;gap:4px}
+  .due-item{display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;background:var(--surface2);font-size:11px;line-height:1.25}
+  .due-item-text{flex:1;min-width:0;word-break:break-word;cursor:pointer}
+  .due-item-del{border:0;background:transparent;color:var(--text2);font:inherit;font-size:14px;line-height:1;cursor:pointer;padding:0 1px}
+  .due-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .due-item[data-status="not-done"]{border-color:var(--red)}
+  .due-item[data-status="act-now"]{border-color:var(--orange)}
+  .due-item[data-status="wait"]{border-color:var(--blue)}
+  .due-item[data-status="complete"]{border-color:var(--green)}
+  .due-item[data-status="not-done"] .due-dot{background:var(--red)}
+  .due-item[data-status="act-now"] .due-dot{background:var(--orange)}
+  .due-item[data-status="wait"] .due-dot{background:var(--blue)}
+  .due-item[data-status="complete"] .due-dot{background:var(--green)}
+  .due-color-pop{position:fixed;z-index:1200;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:7px;box-shadow:0 8px 28px rgba(0,0,0,.35);display:flex;gap:6px}
+  .due-color-btn{width:24px;height:24px;border-radius:50%;border:2px solid rgba(255,255,255,.2);cursor:pointer}
+  .due-color-btn[data-status="not-done"]{background:var(--red)}
+  .due-color-btn[data-status="act-now"]{background:var(--orange)}
+  .due-color-btn[data-status="wait"]{background:var(--blue)}
+  .due-color-btn[data-status="complete"]{background:var(--green)}
   .backlog-toolbar{display:flex;justify-content:flex-end;margin-bottom:8px}
   .backlog-section{border:1px solid var(--border);border-radius:10px;margin:10px 0;overflow:hidden}
   .backlog-section-head{display:flex;align-items:center;gap:8px;padding:9px 10px;background:var(--surface2)}
@@ -770,7 +790,7 @@ const SUPABASE_URL = 'https://yfvvulyoqfqajcgmnbps.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_lLkXO8vRNDzabKb6-Ra7FQ_LcpHonj1';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 let cloudUser = null, cloudReady = false, syncTimer = null, syncing = false;
-function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,version:3}}
+function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,version:4}}
 function applyCloudState(d){
   if(!d || typeof d !== 'object') return;
   if(Array.isArray(d.tasks)) tasks=d.tasks;
@@ -948,7 +968,10 @@ function render() {
         <div class="day-name">${DAY_NAMES[i]}</div>
         <div class="day-date">${day.getDate()}</div>
       </div>
-      <div class="due-box"><div class="due-label">Due</div><textarea class="due-input" placeholder="e.g. Econ presentation due">${escHtml(dueDates[dateStr]||'')}</textarea></div>
+      <div class="due-box">
+        <div class="due-head"><div class="due-label">Due</div><button class="due-add" type="button">+ Add</button></div>
+        <div class="due-list"></div>
+      </div>
       <div class="tasks-list" id="tasks-${dateStr}"></div>
       <div class="add-oneoff-btn" data-date="${dateStr}">+ one-off</div>
       <div class="day-rating">
@@ -957,7 +980,8 @@ function render() {
       </div>
     `;
 
-    const dueInput=col.querySelector('.due-input'); dueInput.addEventListener('input',()=>{const v=dueInput.value;if(v.trim())dueDates[dateStr]=v;else delete dueDates[dateStr];saveDueDates(dueDates)});
+    renderDueItems(col,dateStr);
+    col.querySelector('.due-add').addEventListener('click',()=>addDueItem(dateStr));
     const list = col.querySelector('.tasks-list');
 
     if (dayTasks.length === 0) {
@@ -1023,6 +1047,63 @@ function deleteTask(taskId) {
   saveNotes(notes);
   closePicker();
   render();
+}
+
+
+function normalizeDueData(){
+  Object.keys(dueDates||{}).forEach(date=>{
+    const v=dueDates[date];
+    // Non-destructive migration from the previous single-text-box version.
+    if(typeof v==='string'){
+      dueDates[date]=v.trim()?[{id:uid(),text:v.trim(),status:'not-done'}]:[];
+    } else if(!Array.isArray(v)) dueDates[date]=[];
+    else v.forEach(x=>{if(!x.id)x.id=uid();if(!x.status)x.status='not-done'});
+  });
+}
+normalizeDueData();
+
+function renderDueItems(col,dateStr){
+  normalizeDueData();
+  const box=col.querySelector('.due-list'); if(!box)return;
+  box.innerHTML='';
+  (dueDates[dateStr]||[]).forEach(item=>{
+    const row=document.createElement('div'); row.className='due-item'; row.dataset.status=item.status||'not-done';
+    row.innerHTML=`<span class="due-dot" title="Change color"></span><span class="due-item-text">${escHtml(item.text)}</span><button class="due-item-del" type="button" aria-label="Delete due item">&times;</button>`;
+    row.querySelector('.due-dot').onclick=e=>{e.stopPropagation();showDueColorPicker(e.currentTarget,dateStr,item.id)};
+    row.querySelector('.due-item-text').onclick=()=>editDueItem(dateStr,item.id);
+    row.querySelector('.due-item-del').onclick=e=>{e.stopPropagation();deleteDueItem(dateStr,item.id)};
+    box.appendChild(row);
+  });
+}
+function addDueItem(dateStr){
+  const text=prompt('What is due?'); if(!text||!text.trim())return;
+  normalizeDueData(); if(!dueDates[dateStr])dueDates[dateStr]=[];
+  dueDates[dateStr].push({id:uid(),text:text.trim(),status:'not-done'});
+  saveDueDates(dueDates); render();
+}
+function editDueItem(dateStr,id){
+  const item=(dueDates[dateStr]||[]).find(x=>x.id===id); if(!item)return;
+  const text=prompt('Edit due item',item.text); if(text===null)return;
+  if(!text.trim()){deleteDueItem(dateStr,id);return}
+  item.text=text.trim(); saveDueDates(dueDates); render();
+}
+function deleteDueItem(dateStr,id){
+  dueDates[dateStr]=(dueDates[dateStr]||[]).filter(x=>x.id!==id);
+  if(!dueDates[dateStr].length)delete dueDates[dateStr];
+  saveDueDates(dueDates); render();
+}
+function showDueColorPicker(anchor,dateStr,id){
+  document.querySelectorAll('.due-color-pop').forEach(x=>x.remove());
+  const pop=document.createElement('div'); pop.className='due-color-pop';
+  ['not-done','act-now','wait','complete'].forEach(status=>{
+    const b=document.createElement('button');b.className='due-color-btn';b.dataset.status=status;b.type='button';
+    b.title=status==='not-done'?'Not done':status==='act-now'?'In progress – act now':status==='wait'?'In progress – wait':'Complete';
+    b.onclick=e=>{e.stopPropagation();const item=(dueDates[dateStr]||[]).find(x=>x.id===id);if(item){item.status=status;saveDueDates(dueDates)}pop.remove();render()};
+    pop.appendChild(b);
+  });
+  document.body.appendChild(pop);const r=anchor.getBoundingClientRect(),pr=pop.getBoundingClientRect();
+  pop.style.left=Math.max(6,Math.min(window.innerWidth-pr.width-6,r.left))+'px';pop.style.top=Math.min(window.innerHeight-pr.height-6,r.bottom+5)+'px';
+  setTimeout(()=>document.addEventListener('click',function close(){pop.remove();document.removeEventListener('click',close)},{once:true}),0);
 }
 
 function renderLongTasks(){
