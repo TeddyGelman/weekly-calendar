@@ -199,9 +199,13 @@
   /* One-off tasks are intentionally more prominent than recurring tasks. */
   .task-card.one-off {
     border-width: 3px;
+    box-shadow: inset 0 0 0 1px currentColor;
   }
   .task-card.one-off .task-name {
-    font-weight: 750;
+    font-weight: 800;
+  }
+  .task-card.one-off .task-type-badge {
+    font-weight: 700;
   }
   .task-card.status-not-started {
     background: var(--red-soft);
@@ -941,7 +945,7 @@ function render() {
     if (dayTasks.length === 0) {
       list.innerHTML = '<div class="empty-col">No tasks</div>';
     } else {
-      dayTasks.forEach(t => {
+      dayTasks.forEach((t, dayIndex) => {
         const statusKey = t.id + '_' + dateStr;
         const status = statuses[statusKey] || 'not-started';
         const card = document.createElement('div');
@@ -952,7 +956,7 @@ function render() {
           <div class="task-dot"></div>
           <div class="task-info">
             <div class="task-name">${escHtml(t.name)}</div>
-            <div class="task-order-badge">#${t.order}</div>
+            <div class="task-order-badge">#${dayIndex + 1}</div>
           </div>
           ${t.type === 'one-off' ? '<div class="task-type-badge">one-off</div>' : ''}
           <button class="task-delete" title="Delete task" aria-label="Delete task">&times;</button>
