@@ -176,7 +176,7 @@
   .due-list{display:flex;flex-direction:column;gap:4px}
   .due-item{display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;background:var(--surface2);font-size:11px;line-height:1.25}
   .due-item-text{flex:1;min-width:0;word-break:break-word;cursor:text}
-  .due-item-edit{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-size:11px;padding:0}
+  .due-item-edit{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-size:11px;line-height:1.35;padding:0;resize:none;overflow:hidden;min-height:16px}
   .due-item-del{border:0;background:transparent;color:var(--text2);font:inherit;font-size:14px;line-height:1;cursor:pointer;padding:0 1px}
   .due-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
   .due-item[data-status="not-done"]{border-color:var(--red)}
@@ -212,6 +212,9 @@
   }
 
   /* ── TASK CARD ── */
+  .task-card.calendar-draggable{cursor:grab}
+  .task-card.calendar-draggable.dragging{opacity:.42}
+  .task-card.calendar-drag-over{outline:2px dashed var(--accent);outline-offset:2px}
   .task-card {
     border-radius: 6px;
     border: 1.5px solid transparent;
@@ -791,7 +794,7 @@ const SUPABASE_URL = 'https://yfvvulyoqfqajcgmnbps.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_lLkXO8vRNDzabKb6-Ra7FQ_LcpHonj1';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 let cloudUser = null, cloudReady = false, syncTimer = null, syncing = false;
-function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,version:7}}
+function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,version:9}}
 function applyCloudState(d){
   if(!d || typeof d !== 'object') return;
   if(Array.isArray(d.tasks)) tasks=d.tasks;
@@ -954,6 +957,19 @@ let currentMonday = weekStart(new Date());
 let pickerTarget = null; // { taskId, dateStr }
 
 // ── RENDER ───────────────────────────────────────────────────────
+function reorderCalendarTask(movingId,targetId,dateStr){
+  const visible=tasks.filter(t=>t.type!=='one-off'||t.date===dateStr).sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name));
+  const moving=visible.find(t=>t.id===movingId);if(!moving)return;
+  const arr=visible.filter(t=>t.id!==movingId);
+  let idx=targetId?arr.findIndex(t=>t.id===targetId):arr.length;if(idx<0)idx=arr.length;arr.splice(idx,0,moving);
+  // Assign monotonically increasing internal orders matching this day's dragged sequence.
+  // Recurring tasks keep the resulting base order; dated one-offs remain tied to their exact date.
+  arr.forEach((t,i)=>{t.order=(i+1)*10});
+  // Tasks not visible on this date retain their existing order/data.
+  tasks.sort((a,b)=>a.order-b.order||a.name.localeCompare(b.name));
+  saveTasks(tasks);render();
+}
+
 function render() {
   document.getElementById('weekLabel').textContent = calendarView === 'day' ? (DAY_NAMES[(selectedDay.getDay()+6)%7] + ', ' + MONTHS[selectedDay.getMonth()] + ' ' + selectedDay.getDate() + ', ' + selectedDay.getFullYear()) : fmtWeekLabel(currentMonday);
   document.getElementById('weekViewBtn').classList.toggle('active', calendarView === 'week');
@@ -977,7 +993,9 @@ function render() {
       .filter(t => {
         if (t.type === 'recurring') return true;
         if (t.type === 'one-off') {
-          if (isPast && t.date < today) return false;
+          // One-off tasks are permanent historical entries.
+          // They appear only on the exact date they were created for,
+          // including after that date has passed.
           return t.date === dateStr;
         }
         return false;
@@ -1006,6 +1024,8 @@ function render() {
     renderDueItems(col,dateStr);
     col.querySelector('.due-add').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();addDueItem(dateStr);});
     const list = col.querySelector('.tasks-list');
+    list.addEventListener('dragover',e=>e.preventDefault());
+    list.addEventListener('drop',e=>{if(e.target.closest('.task-card'))return;let d;try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}if(d&&d.dateStr===dateStr)reorderCalendarTask(d.taskId,null,dateStr)});
 
     if (dayTasks.length === 0) {
       list.innerHTML = '<div class="empty-col">No tasks</div>';
@@ -1015,6 +1035,8 @@ function render() {
         const status = statuses[statusKey] || 'not-started';
         const card = document.createElement('div');
         card.className = 'task-card status-' + status + (t.type === 'one-off' ? ' one-off' : '');
+      card.classList.add('calendar-draggable');
+      card.draggable=true; card.dataset.taskId=t.id; card.dataset.dateStr=dateStr;
         card.dataset.taskId = t.id;
         card.dataset.date = dateStr;
         card.innerHTML = `
@@ -1028,7 +1050,16 @@ function render() {
         `;
         card.addEventListener('click', (e) => openPicker(e, t.id, dateStr));
         card.querySelector('.task-delete').addEventListener('click', (e) => { e.stopPropagation(); deleteTask(t.id); });
-        list.appendChild(card);
+        card.addEventListener('dragstart',e=>{
+        if(e.target.closest('button,input,textarea')){e.preventDefault();return;}
+        card.classList.add('dragging');e.dataTransfer.effectAllowed='move';
+        e.dataTransfer.setData('text/plain',JSON.stringify({taskId:t.id,dateStr}));
+      });
+      card.addEventListener('dragend',()=>{card.classList.remove('dragging');document.querySelectorAll('.calendar-drag-over').forEach(x=>x.classList.remove('calendar-drag-over'))});
+      card.addEventListener('dragover',e=>{e.preventDefault();card.classList.add('calendar-drag-over')});
+      card.addEventListener('dragleave',()=>card.classList.remove('calendar-drag-over'));
+      card.addEventListener('drop',e=>{e.preventDefault();e.stopPropagation();card.classList.remove('calendar-drag-over');let d;try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}if(d&&d.dateStr===dateStr&&d.taskId!==t.id)reorderCalendarTask(d.taskId,t.id,dateStr)});
+      list.appendChild(card);
       });
     }
 
@@ -1086,22 +1117,22 @@ function normalizeDueData(){
 normalizeDueData();
 localStorage.setItem(DUE_KEY,JSON.stringify(dueDates));
 
+function autoSizeDue(el){if(!el)return;el.style.height='auto';el.style.height=Math.max(16,el.scrollHeight)+'px';}
 function renderDueItems(col,dateStr){
   normalizeDueData();
   const box=col.querySelector('.due-list'); if(!box)return;
   box.innerHTML='';
   (dueDates[dateStr]||[]).forEach(item=>{
     const row=document.createElement('div'); row.className='due-item'; row.dataset.status=item.status||'not-done';
-    row.innerHTML=`<span class="due-dot" title="Change color"></span><input class="due-item-edit" value="${escHtml(item.text)}" placeholder="Type what is due…" aria-label="Due item"><button class="due-item-del" type="button" aria-label="Delete due item">&times;</button>`;
+    row.innerHTML=`<span class="due-dot" title="Change color"></span><textarea class="due-item-edit" rows="1" placeholder="Type what is due…" aria-label="Due item">${escHtml(item.text)}</textarea><button class="due-item-del" type="button" aria-label="Delete due item">&times;</button>`;
     const input=row.querySelector('.due-item-edit');
+    autoSizeDue(input);
     row.querySelector('.due-dot').onclick=e=>{e.stopPropagation();showDueColorPicker(e.currentTarget,dateStr,item.id)};
     input.addEventListener('click',e=>e.stopPropagation());
-    input.addEventListener('keydown',e=>{
-      e.stopPropagation();
-      if(e.key==='Enter'){e.preventDefault();input.blur();}
-    });
+    input.addEventListener('keydown',e=>e.stopPropagation());
     input.addEventListener('input',()=>{
       item.text=input.value;
+      autoSizeDue(input);
       saveDueDates(dueDates);
     });
     input.addEventListener('blur',()=>{
