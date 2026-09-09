@@ -175,7 +175,8 @@
   .due-add{border:1px solid var(--border);background:transparent;color:var(--text2);border-radius:6px;font:inherit;font-size:10px;padding:2px 6px;cursor:pointer}
   .due-list{display:flex;flex-direction:column;gap:4px}
   .due-item{display:flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:6px;padding:5px 6px;background:var(--surface2);font-size:11px;line-height:1.25}
-  .due-item-text{flex:1;min-width:0;word-break:break-word;cursor:pointer}
+  .due-item-text{flex:1;min-width:0;word-break:break-word;cursor:text}
+  .due-item-edit{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-size:11px;padding:0}
   .due-item-del{border:0;background:transparent;color:var(--text2);font:inherit;font-size:14px;line-height:1;cursor:pointer;padding:0 1px}
   .due-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
   .due-item[data-status="not-done"]{border-color:var(--red)}
@@ -790,7 +791,7 @@ const SUPABASE_URL = 'https://yfvvulyoqfqajcgmnbps.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_lLkXO8vRNDzabKb6-Ra7FQ_LcpHonj1';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 let cloudUser = null, cloudReady = false, syncTimer = null, syncing = false;
-function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,version:4}}
+function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,version:6}}
 function applyCloudState(d){
   if(!d || typeof d !== 'object') return;
   if(Array.isArray(d.tasks)) tasks=d.tasks;
@@ -801,17 +802,32 @@ function applyCloudState(d){
   localStorage.setItem(RATINGS_KEY,JSON.stringify(ratings)); localStorage.setItem(DUE_KEY,JSON.stringify(dueDates)); localStorage.setItem(BACKLOG_SECTIONS_KEY,JSON.stringify(backlogSections));
 }
 function setSyncText(t){ const el=document.getElementById('syncPill'); if(el){el.style.display='block';el.textContent=t;} }
-function scheduleCloudSync(){ if(!cloudReady||!cloudUser) return; clearTimeout(syncTimer); syncTimer=setTimeout(pushCloudState,350); }
+let localRevision=0, syncedRevision=0;
+function scheduleCloudSync(){
+  localRevision++;
+  if(!cloudReady||!cloudUser)return;
+  clearTimeout(syncTimer);
+  syncTimer=setTimeout(pushCloudState,350);
+}
 async function pushCloudState(){
-  if(!cloudReady||!cloudUser||syncing) return; syncing=true; setSyncText('Saving…');
-  const {error}=await sb.from('calendar_state').upsert({user_id:cloudUser.id,data:snapshotState()},{onConflict:'user_id'});
-  syncing=false; setSyncText(error?'Sync error':'Synced'); if(error) console.error(error);
+  if(!cloudReady||!cloudUser)return;
+  if(syncing){clearTimeout(syncTimer);syncTimer=setTimeout(pushCloudState,400);return;}
+  syncing=true;
+  const rev=localRevision, state=snapshotState();
+  setSyncText('Saving…');
+  const {error}=await sb.from('calendar_state').upsert({user_id:cloudUser.id,data:state},{onConflict:'user_id'});
+  syncing=false;
+  if(error){setSyncText('Sync error');console.error(error);return;}
+  syncedRevision=Math.max(syncedRevision,rev);
+  if(localRevision>rev){clearTimeout(syncTimer);syncTimer=setTimeout(pushCloudState,100);}
+  else setSyncText('Synced');
 }
 async function openCloudCalendar(user){
   cloudUser=user; setSyncText('Loading…');
   const {data,error}=await sb.from('calendar_state').select('data').eq('user_id',user.id).maybeSingle();
   if(error){ setSyncText('Sync error'); document.getElementById('authError').textContent=error.message; return; }
   if(data && data.data){ applyCloudState(data.data); }
+  localRevision=0; syncedRevision=0;
   cloudReady=true; document.getElementById('authGate').style.display='none'; render(); renderLongTasks();
   if(!data) await pushCloudState(); else setSyncText('Synced');
 }
@@ -859,7 +875,12 @@ function saveLong(l) { localStorage.setItem(LONG_KEY, JSON.stringify(l)); schedu
 function loadRatings() { try { return JSON.parse(localStorage.getItem(RATINGS_KEY) || '{}'); } catch { return {}; } }
 function saveRatings(r){localStorage.setItem(RATINGS_KEY,JSON.stringify(r));scheduleCloudSync()}
 function loadDueDates(){try{return JSON.parse(localStorage.getItem(DUE_KEY)||'{}')}catch{return {}}}
-function saveDueDates(d){localStorage.setItem(DUE_KEY,JSON.stringify(d));scheduleCloudSync()}
+function saveDueDates(d){
+  localStorage.setItem(DUE_KEY,JSON.stringify(d));
+  // Persist the complete current state; the cloud sync is debounced but local UI
+  // remains authoritative until it completes.
+  scheduleCloudSync();
+}
 function loadBacklogSections(){try{return JSON.parse(localStorage.getItem(BACKLOG_SECTIONS_KEY)||'null')||[{id:'general',name:'General'}]}catch{return [{id:'general',name:'General'}]}}
 function saveBacklogSections(x){localStorage.setItem(BACKLOG_SECTIONS_KEY,JSON.stringify(x));scheduleCloudSync()}
 
@@ -1061,6 +1082,7 @@ function normalizeDueData(){
   });
 }
 normalizeDueData();
+localStorage.setItem(DUE_KEY,JSON.stringify(dueDates));
 
 function renderDueItems(col,dateStr){
   normalizeDueData();
@@ -1068,37 +1090,55 @@ function renderDueItems(col,dateStr){
   box.innerHTML='';
   (dueDates[dateStr]||[]).forEach(item=>{
     const row=document.createElement('div'); row.className='due-item'; row.dataset.status=item.status||'not-done';
-    row.innerHTML=`<span class="due-dot" title="Change color"></span><span class="due-item-text">${escHtml(item.text)}</span><button class="due-item-del" type="button" aria-label="Delete due item">&times;</button>`;
+    row.innerHTML=`<span class="due-dot" title="Change color"></span><input class="due-item-edit" value="${escHtml(item.text)}" placeholder="Type what is due…" aria-label="Due item"><button class="due-item-del" type="button" aria-label="Delete due item">&times;</button>`;
+    const input=row.querySelector('.due-item-edit');
     row.querySelector('.due-dot').onclick=e=>{e.stopPropagation();showDueColorPicker(e.currentTarget,dateStr,item.id)};
-    row.querySelector('.due-item-text').onclick=()=>editDueItem(dateStr,item.id);
+    input.addEventListener('input',()=>{
+      item.text=input.value;
+      saveDueDates(dueDates);
+    });
+    input.addEventListener('blur',()=>{
+      item.text=input.value.trim();
+      input.value=item.text;
+      saveDueDates(dueDates);
+    });
     row.querySelector('.due-item-del').onclick=e=>{e.stopPropagation();deleteDueItem(dateStr,item.id)};
     box.appendChild(row);
   });
 }
 function addDueItem(dateStr){
-  const text=prompt('What is due?'); if(!text||!text.trim())return;
   normalizeDueData(); if(!dueDates[dateStr])dueDates[dateStr]=[];
-  dueDates[dateStr].push({id:uid(),text:text.trim(),status:'not-done'});
-  saveDueDates(dueDates); render();
-}
-function editDueItem(dateStr,id){
-  const item=(dueDates[dateStr]||[]).find(x=>x.id===id); if(!item)return;
-  const text=prompt('Edit due item',item.text); if(text===null)return;
-  if(!text.trim()){deleteDueItem(dateStr,id);return}
-  item.text=text.trim(); saveDueDates(dueDates); render();
+  const item={id:uid(),text:'',status:'not-done'};
+  dueDates[dateStr].push(item);
+  saveDueDates(dueDates);
+
+  // Update only this day's due list, avoiding a full render that can interrupt editing.
+  const col=[...document.querySelectorAll('.day-col')].find(c=>c.querySelector('.due-add') && c.querySelector('.due-list') && c.querySelector(`#tasks-${dateStr}`));
+  if(col){
+    renderDueItems(col,dateStr);
+    const inputs=col.querySelectorAll('.due-item-edit');
+    const input=inputs[inputs.length-1];
+    if(input) setTimeout(()=>input.focus(),30);
+  } else {
+    render();
+  }
 }
 function deleteDueItem(dateStr,id){
   dueDates[dateStr]=(dueDates[dateStr]||[]).filter(x=>x.id!==id);
   if(!dueDates[dateStr].length)delete dueDates[dateStr];
-  saveDueDates(dueDates); render();
+  saveDueDates(dueDates);
+  const list=document.getElementById(`tasks-${dateStr}`);
+  const col=list?list.closest('.day-col'):null;
+  if(col)renderDueItems(col,dateStr); else render();
 }
+
 function showDueColorPicker(anchor,dateStr,id){
   document.querySelectorAll('.due-color-pop').forEach(x=>x.remove());
   const pop=document.createElement('div'); pop.className='due-color-pop';
   ['not-done','act-now','wait','complete'].forEach(status=>{
     const b=document.createElement('button');b.className='due-color-btn';b.dataset.status=status;b.type='button';
     b.title=status==='not-done'?'Not done':status==='act-now'?'In progress – act now':status==='wait'?'In progress – wait':'Complete';
-    b.onclick=e=>{e.stopPropagation();const item=(dueDates[dateStr]||[]).find(x=>x.id===id);if(item){item.status=status;saveDueDates(dueDates)}pop.remove();render()};
+    b.onclick=e=>{e.stopPropagation();const item=(dueDates[dateStr]||[]).find(x=>x.id===id);if(item){item.status=status;saveDueDates(dueDates)}pop.remove();const list=document.getElementById(`tasks-${dateStr}`),col=list?list.closest('.day-col'):null;if(col)renderDueItems(col,dateStr);};
     pop.appendChild(b);
   });
   document.body.appendChild(pop);const r=anchor.getBoundingClientRect(),pr=pop.getBoundingClientRect();
@@ -1343,6 +1383,8 @@ function addLong() {
 
 // ── CLOUD / BACKUP UTILITIES ─────────────────────────────────────
 async function pullCloudState(showStatus=true) {
+  if(localRevision>syncedRevision || syncing) return;
+
   if (!cloudUser) return;
   if (showStatus) setSyncText('Refreshing…');
   const {data,error}=await sb.from('calendar_state').select('data').eq('user_id',cloudUser.id).maybeSingle();
