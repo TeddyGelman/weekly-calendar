@@ -169,6 +169,15 @@
     line-height: 1.1;
     margin-top: 2px;
   }
+  .due-box{margin:0 8px 8px;padding:7px 9px;border:1px dashed var(--border);border-radius:8px;background:rgba(255,255,255,.025)}
+  .due-label{font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);margin-bottom:4px}
+  .due-input{width:100%;min-height:30px;resize:vertical;border:0;outline:0;background:transparent;color:var(--text);font:inherit;font-size:12px;line-height:1.35;padding:0}
+  .backlog-toolbar{display:flex;justify-content:flex-end;margin-bottom:8px}
+  .backlog-section{border:1px solid var(--border);border-radius:10px;margin:10px 0;overflow:hidden}
+  .backlog-section-head{display:flex;align-items:center;gap:8px;padding:9px 10px;background:var(--surface2)}
+  .backlog-section-title{flex:1;font-weight:800;font-size:12px}.backlog-section-items{padding:6px;min-height:38px}
+  .backlog-item{cursor:grab}.backlog-item.dragging{opacity:.45}.backlog-drag{color:var(--text2);font-size:15px;padding-right:5px;cursor:grab}
+  .backlog-mini-btn{border:1px solid var(--border);background:transparent;color:var(--text2);border-radius:6px;font:inherit;font-size:10px;padding:3px 6px;cursor:pointer}
   .day-col.today .day-header { background: var(--blue-soft); }
   .day-col.today .day-date { color: var(--blue); }
   .day-col.past { opacity: .7; }
@@ -730,6 +739,7 @@
 <!-- STATUS PICKER + NOTES -->
 <div class="status-picker" id="statusPicker" style="display:none">
   <div class="status-picker-title" id="pickerTitle">Set Status</div>
+  <div class="notes-wrap"><div class="notes-label">Task title</div><input class="notes" id="taskTitleEdit" style="min-height:0;resize:none"><div class="notes-hint">Saved automatically.</div></div>
   <div class="status-option" data-status="not-started">
     <div class="dot" style="background:var(--red)"></div> Not Started
   </div>
@@ -760,15 +770,15 @@ const SUPABASE_URL = 'https://yfvvulyoqfqajcgmnbps.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_lLkXO8vRNDzabKb6-Ra7FQ_LcpHonj1';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 let cloudUser = null, cloudReady = false, syncTimer = null, syncing = false;
-function snapshotState(){ return {tasks,statuses,notes,longTasks,ratings,version:2}; }
+function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,version:3}}
 function applyCloudState(d){
   if(!d || typeof d !== 'object') return;
   if(Array.isArray(d.tasks)) tasks=d.tasks;
   if(d.statuses) statuses=d.statuses; if(d.notes) notes=d.notes;
-  if(Array.isArray(d.longTasks)) longTasks=d.longTasks; if(d.ratings) ratings=d.ratings;
+  if(Array.isArray(d.longTasks)) longTasks=d.longTasks; if(d.ratings) ratings=d.ratings; if(d.dueDates) dueDates=d.dueDates; if(Array.isArray(d.backlogSections)) backlogSections=d.backlogSections;
   localStorage.setItem(TASKS_KEY,JSON.stringify(tasks)); localStorage.setItem(STATUS_KEY,JSON.stringify(statuses));
   localStorage.setItem(NOTES_KEY,JSON.stringify(notes)); localStorage.setItem(LONG_KEY,JSON.stringify(longTasks));
-  localStorage.setItem(RATINGS_KEY,JSON.stringify(ratings));
+  localStorage.setItem(RATINGS_KEY,JSON.stringify(ratings)); localStorage.setItem(DUE_KEY,JSON.stringify(dueDates)); localStorage.setItem(BACKLOG_SECTIONS_KEY,JSON.stringify(backlogSections));
 }
 function setSyncText(t){ const el=document.getElementById('syncPill'); if(el){el.style.display='block';el.textContent=t;} }
 function scheduleCloudSync(){ if(!cloudReady||!cloudUser) return; clearTimeout(syncTimer); syncTimer=setTimeout(pushCloudState,350); }
@@ -803,6 +813,7 @@ const STATUS_KEY = 'wc_statuses_v2';
 const NOTES_KEY = 'wc_notes_v1';
 const LONG_KEY = 'wc_long_v2';
 const RATINGS_KEY = 'wc_ratings_v1';
+const DUE_KEY='wc_due_v1'; const BACKLOG_SECTIONS_KEY='wc_backlog_sections_v1';
 const VIEW_KEY = 'wc_view_v1';
 
 function loadTasks() {
@@ -826,7 +837,11 @@ function loadLong() {
 }
 function saveLong(l) { localStorage.setItem(LONG_KEY, JSON.stringify(l)); scheduleCloudSync(); }
 function loadRatings() { try { return JSON.parse(localStorage.getItem(RATINGS_KEY) || '{}'); } catch { return {}; } }
-function saveRatings(r) { localStorage.setItem(RATINGS_KEY, JSON.stringify(r)); scheduleCloudSync(); }
+function saveRatings(r){localStorage.setItem(RATINGS_KEY,JSON.stringify(r));scheduleCloudSync()}
+function loadDueDates(){try{return JSON.parse(localStorage.getItem(DUE_KEY)||'{}')}catch{return {}}}
+function saveDueDates(d){localStorage.setItem(DUE_KEY,JSON.stringify(d));scheduleCloudSync()}
+function loadBacklogSections(){try{return JSON.parse(localStorage.getItem(BACKLOG_SECTIONS_KEY)||'null')||[{id:'general',name:'General'}]}catch{return [{id:'general',name:'General'}]}}
+function saveBacklogSections(x){localStorage.setItem(BACKLOG_SECTIONS_KEY,JSON.stringify(x));scheduleCloudSync()}
 
 function defaultTasks() {
   return [
@@ -888,7 +903,8 @@ let tasks = loadTasks();
 let statuses = loadStatuses();
 let notes = loadNotes();
 let longTasks = loadLong();
-let ratings = loadRatings();
+let ratings=loadRatings();
+let dueDates=loadDueDates(); let backlogSections=loadBacklogSections();
 let calendarView = localStorage.getItem(VIEW_KEY) || (window.matchMedia('(max-width: 700px)').matches ? 'day' : 'week');
 let selectedDay = new Date();
 let currentMonday = weekStart(new Date());
@@ -932,6 +948,7 @@ function render() {
         <div class="day-name">${DAY_NAMES[i]}</div>
         <div class="day-date">${day.getDate()}</div>
       </div>
+      <div class="due-box"><div class="due-label">Due</div><textarea class="due-input" placeholder="e.g. Econ presentation due">${escHtml(dueDates[dateStr]||'')}</textarea></div>
       <div class="tasks-list" id="tasks-${dateStr}"></div>
       <div class="add-oneoff-btn" data-date="${dateStr}">+ one-off</div>
       <div class="day-rating">
@@ -940,6 +957,7 @@ function render() {
       </div>
     `;
 
+    const dueInput=col.querySelector('.due-input'); dueInput.addEventListener('input',()=>{const v=dueInput.value;if(v.trim())dueDates[dateStr]=v;else delete dueDates[dateStr];saveDueDates(dueDates)});
     const list = col.querySelector('.tasks-list');
 
     if (dayTasks.length === 0) {
@@ -980,14 +998,23 @@ function render() {
 function deleteTask(taskId) {
   const task = tasks.find(t => t.id === taskId);
   if (!task) return;
+
+  // Capture the visible position of this task on relevant dates before removal.
+  const relevantDates = [];
+  if (task.type === 'one-off' && task.date) {
+    relevantDates.push(task.date);
+  } else {
+    // Recurring tasks appear every day; normalize against the current visible week.
+    for (let i = 0; i < 7; i++) relevantDates.push(fmtDate(addDays(currentMonday, i)));
+  }
+
   tasks = tasks.filter(t => t.id !== taskId);
 
-  // Close any numbering gaps left by the deleted task.
-  // Example: deleting #14 turns #15, #16, ... into #14, #15, ...
-  tasks = tasks.map(t => ({
-    ...t,
-    order: t.order > task.order ? t.order - 1 : t.order
-  })).sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+  // Rebuild global order from the current recurring sequence, while one-offs
+  // retain their requested day-relative positions. Display numbering is always
+  // contiguous, so deleted slots disappear immediately.
+  const recurring = tasks.filter(t => t.type === 'recurring').sort((a,b) => a.order-b.order || a.name.localeCompare(b.name));
+  recurring.forEach((t,i) => t.order = i + 1);
 
   Object.keys(statuses).forEach(k => { if (k.startsWith(taskId + '_')) delete statuses[k]; });
   Object.keys(notes).forEach(k => { if (k.startsWith(taskId + '_')) delete notes[k]; });
@@ -998,21 +1025,16 @@ function deleteTask(taskId) {
   render();
 }
 
-function renderLongTasks() {
-  const list = document.getElementById('longTasksList');
-  list.innerHTML = '';
-  if (longTasks.length === 0) {
-    list.innerHTML = '<div style="color:var(--text2);font-size:12px;text-align:center;padding:12px">Nothing here yet.</div>';
-    return;
-  }
-  longTasks.forEach(lt => {
-    const item = document.createElement('div');
-    item.className = 'long-task-item';
-    item.innerHTML = `<span class="long-task-text">${escHtml(lt.text)}</span><span class="long-task-del" data-id="${lt.id}">&times;</span>`;
-    item.querySelector('.long-task-del').addEventListener('click', () => deleteLongTask(lt.id));
-    list.appendChild(item);
-  });
-}
+function renderLongTasks(){
+ const list=document.getElementById('longTasksList');list.innerHTML='';if(!backlogSections.length)backlogSections=[{id:'general',name:'General'}];
+ longTasks.forEach((t,i)=>{if(!t.sectionId)t.sectionId='general';if(!Number.isFinite(Number(t.backlogOrder)))t.backlogOrder=i+1});
+ const bar=document.createElement('div');bar.className='backlog-toolbar';bar.innerHTML='<button class="backlog-mini-btn">+ Section</button>';bar.firstChild.onclick=()=>{const n=prompt('Section name');if(n&&n.trim()){backlogSections.push({id:uid(),name:n.trim()});saveBacklogSections(backlogSections);renderLongTasks()}};list.appendChild(bar);
+ backlogSections.forEach(sec=>{const w=document.createElement('div');w.className='backlog-section';w.innerHTML=`<div class="backlog-section-head"><div class="backlog-section-title">${escHtml(sec.name)}</div><button class="backlog-mini-btn ren">Rename</button>${sec.id==='general'?'':'<button class="backlog-mini-btn del">×</button>'}</div><div class="backlog-section-items"></div>`;
+ w.querySelector('.ren').onclick=()=>{const n=prompt('Rename section',sec.name);if(n&&n.trim()){sec.name=n.trim();saveBacklogSections(backlogSections);renderLongTasks()}};const d=w.querySelector('.del');if(d)d.onclick=()=>{longTasks.forEach(t=>{if(t.sectionId===sec.id)t.sectionId='general'});backlogSections=backlogSections.filter(x=>x.id!==sec.id);normalizeBacklog();saveLong(longTasks);saveBacklogSections(backlogSections);renderLongTasks()};
+ const box=w.querySelector('.backlog-section-items');longTasks.filter(t=>t.sectionId===sec.id).sort((a,b)=>a.backlogOrder-b.backlogOrder).forEach(lt=>{const item=document.createElement('div');item.className='long-task-item backlog-item';item.draggable=true;item.dataset.id=lt.id;item.innerHTML=`<span class="backlog-drag">≡</span><span class="long-task-text">${escHtml(lt.text)}</span><span class="long-task-del">&times;</span>`;item.querySelector('.long-task-del').onclick=e=>{e.stopPropagation();deleteLongTask(lt.id)};item.ondragstart=e=>{item.classList.add('dragging');e.dataTransfer.setData('text/plain',lt.id)};item.ondragend=()=>item.classList.remove('dragging');box.appendChild(item)});
+ box.ondragover=e=>{e.preventDefault();const x=document.querySelector('.backlog-item.dragging');if(!x)return;const y=dragAfter(box,e.clientY);y?box.insertBefore(x,y):box.appendChild(x)};box.ondrop=e=>{e.preventDefault();const t=longTasks.find(x=>x.id===e.dataTransfer.getData('text/plain'));if(!t)return;t.sectionId=sec.id;[...box.querySelectorAll('.backlog-item')].forEach((el,i)=>{const q=longTasks.find(x=>x.id===el.dataset.id);if(q){q.sectionId=sec.id;q.backlogOrder=i+1}});normalizeBacklog();saveLong(longTasks);renderLongTasks()};list.appendChild(w)})}
+function dragAfter(c,y){return [...c.querySelectorAll('.backlog-item:not(.dragging)')].reduce((q,e)=>{const b=e.getBoundingClientRect(),o=y-b.top-b.height/2;return o<0&&o>q.o?{o,e}:q},{o:-Infinity}).e}
+function normalizeBacklog(){backlogSections.forEach(s=>longTasks.filter(t=>t.sectionId===s.id).sort((a,b)=>a.backlogOrder-b.backlogOrder).forEach((t,i)=>t.backlogOrder=i+1))}
 
 // ── STATUS PICKER ────────────────────────────────────────────────
 function openPicker(e, taskId, dateStr) {
@@ -1031,7 +1053,7 @@ function openPicker(e, taskId, dateStr) {
   document.getElementById('taskNotes').value = notes[notesKey] || '';
 
   const task = tasks.find(t => t.id === taskId);
-  document.getElementById('pickerTitle').textContent = task ? task.name : 'Set Status';
+  document.getElementById('pickerTitle').textContent=task?task.name:'Set Status'; document.getElementById('taskTitleEdit').value=task?task.name:'';
 
   picker.style.display = 'flex';
   picker.style.flexDirection = 'column';
@@ -1058,7 +1080,8 @@ document.getElementById('statusPicker').querySelectorAll('.status-option').forEa
   });
 });
 
-// Autosave notes
+// Autosave title + notes
+let titleSaveTimer=null;document.getElementById('taskTitleEdit').addEventListener('input',e=>{if(!pickerTarget)return;const t=tasks.find(x=>x.id===pickerTarget.taskId);if(!t)return;const v=e.target.value;clearTimeout(titleSaveTimer);titleSaveTimer=setTimeout(()=>{if(!v.trim())return;t.name=v.trim();document.getElementById('pickerTitle').textContent=t.name;saveTasks(tasks);render()},250)});
 let notesSaveTimer = null;
 document.getElementById('taskNotes').addEventListener('input', (e) => {
   if (!pickerTarget) return;
@@ -1143,21 +1166,38 @@ document.getElementById('saveTask').addEventListener('click', () => {
   if (type === 'one-off' && !date) { alert('Please select a date for the one-off task.'); return; }
 
   let order = parseInt(document.getElementById('taskOrder').value);
-  const recurringTasks = tasks.filter(t => t.type === 'recurring');
-  const maxOrder = recurringTasks.length > 0 ? Math.max(...recurringTasks.map(t => t.order)) : 0;
 
-  if (isNaN(order) || order < 1) {
-    order = maxOrder + 1;
+  if (type === 'one-off') {
+    // Position is relative to the tasks actually visible on this date.
+    const visible = tasks
+      .filter(t => t.type === 'recurring' || (t.type === 'one-off' && t.date === date))
+      .sort((a,b) => a.order - b.order || a.name.localeCompare(b.name));
+
+    if (isNaN(order) || order < 1) order = visible.length + 1;
+    order = Math.min(order, visible.length + 1);
+
+    // Find the surrounding visible tasks and assign an order between them.
+    // Fractional internal values are fine; the UI still displays #1, #2, #3...
+    const before = visible[order - 2];
+    const after = visible[order - 1];
+    if (!before && after) order = after.order - 0.5;
+    else if (before && after) order = (before.order + after.order) / 2;
+    else if (before) order = before.order + 0.5;
+    else order = 1;
   } else {
-    tasks = tasks.map(t => {
-      if (t.order >= order) return { ...t, order: t.order + 1 };
-      return t;
+    // Recurring-task positions are relative to the recurring sequence.
+    const recurring = tasks.filter(t => t.type === 'recurring').sort((a,b) => a.order-b.order);
+    if (isNaN(order) || order < 1) order = recurring.length + 1;
+    order = Math.min(order, recurring.length + 1);
+
+    recurring.forEach(t => {
+      if (t.order >= order) t.order += 1;
     });
   }
 
   const newTask = { id: uid(), name, order, type, date };
   tasks.push(newTask);
-  tasks.sort((a, b) => a.order - b.order);
+  tasks.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
   saveTasks(tasks);
 
   document.getElementById('addModal').style.display = 'none';
@@ -1214,7 +1254,7 @@ document.getElementById('longTaskInput').addEventListener('keydown', (e) => {
 function addLong() {
   const text = document.getElementById('longTaskInput').value.trim();
   if (!text) return;
-  longTasks.push({ id: uid(), text });
+  longTasks.push({id:uid(),text,sectionId:'general',backlogOrder:longTasks.filter(t=>(t.sectionId||'general')==='general').length+1});
   saveLong(longTasks);
   document.getElementById('longTaskInput').value = '';
   renderLongTasks();
