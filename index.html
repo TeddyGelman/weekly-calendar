@@ -665,7 +665,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div id="buildBadge" style="position:absolute;right:8px;top:4px;font-size:9px;opacity:.4;z-index:5">v14</div>
+<body><div id="buildBadge" style="position:absolute;right:8px;top:4px;font-size:9px;opacity:.4;z-index:5">v15</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -796,7 +796,7 @@ const SUPABASE_URL = 'https://yfvvulyoqfqajcgmnbps.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_lLkXO8vRNDzabKb6-Ra7FQ_LcpHonj1';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 let cloudUser = null, cloudReady = false, syncTimer = null, syncing = false;
-function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,version:14}}
+function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,version:15}}
 function applyCloudState(d){
   if(!d || typeof d !== 'object') return;
   if(Array.isArray(d.tasks)) tasks=d.tasks;
@@ -1051,6 +1051,19 @@ function render() {
         card.dataset.taskId = t.id;
         card.dataset.date = dateStr;
         card.draggable = true;
+        card.innerHTML = `
+          <div class="task-reorder" aria-label="Reorder task">
+            <button class="task-move move-up" type="button" title="Move up">▲</button>
+            <button class="task-move move-down" type="button" title="Move down">▼</button>
+          </div>
+          <div class="task-dot"></div>
+          <div class="task-info">
+            <div class="task-name">${escHtml(t.name)}</div>
+            <div class="task-order-badge">#${dayIndex + 1}</div>
+          </div>
+          ${t.type === 'one-off' ? '<div class="task-type-badge">one-off</div>' : ''}
+          <button class="task-delete" title="Delete task" aria-label="Delete task">&times;</button>
+        `;
         card.querySelector('.move-up').addEventListener('click',e=>{e.stopPropagation();moveCalendarTask(t.id,dateStr,-1)});
         card.querySelector('.move-down').addEventListener('click',e=>{e.stopPropagation();moveCalendarTask(t.id,dateStr,1)});
         card.addEventListener('dragstart',e=>{
@@ -1067,19 +1080,6 @@ function render() {
           let d;try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}
           if(d&&d.dateStr===dateStr&&d.taskId!==t.id)dragCalendarTask(d.taskId,t.id,dateStr);
         });
-        card.innerHTML = `
-          <div class="task-reorder" aria-label="Reorder task">
-            <button class="task-move move-up" type="button" title="Move up">▲</button>
-            <button class="task-move move-down" type="button" title="Move down">▼</button>
-          </div>
-          <div class="task-dot"></div>
-          <div class="task-info">
-            <div class="task-name">${escHtml(t.name)}</div>
-            <div class="task-order-badge">#${dayIndex + 1}</div>
-          </div>
-          ${t.type === 'one-off' ? '<div class="task-type-badge">one-off</div>' : ''}
-          <button class="task-delete" title="Delete task" aria-label="Delete task">&times;</button>
-        `;
         card.addEventListener('click', (e) => openPicker(e, t.id, dateStr));
         card.querySelector('.task-delete').addEventListener('click', (e) => { e.stopPropagation(); deleteTask(t.id); });
         list.appendChild(card);
