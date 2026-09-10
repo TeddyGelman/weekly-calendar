@@ -667,7 +667,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v19-drag-manual</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v20-no-oneoff-label</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -1133,7 +1133,6 @@ function render() {
             <div class="task-name">${escHtml(t.name)}</div>
             <div class="task-order-badge">#${dayIndex + 1}</div>
           </div>
-          ${t.type === 'one-off' ? '<div class="task-type-badge">one-off</div>' : ''}
           <button class="task-delete" title="Delete task" aria-label="Delete task">&times;</button>
         `;
         card.addEventListener('dragstart',e=>{
