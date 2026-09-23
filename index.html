@@ -669,7 +669,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v21-notes</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v22-smart-popup</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -1348,10 +1348,52 @@ function openPicker(e, taskId, dateStr) {
   picker.style.display = 'flex';
   picker.style.flexDirection = 'column';
 
-  const x = Math.min(e.clientX + 8, window.innerWidth - 260);
-  const y = Math.min(e.clientY + 8, window.innerHeight - 360);
-  picker.style.left = x + 'px';
-  picker.style.top = y + 'px';
+  // Position the picker intelligently so the full Notes section stays on-screen.
+  // First render it invisibly so we can measure its actual size.
+  picker.style.visibility = 'hidden';
+  picker.style.left = '12px';
+  picker.style.top = '12px';
+
+  requestAnimationFrame(() => {
+    const margin = 12;
+    const gap = 8;
+    const rect = picker.getBoundingClientRect();
+    const pickerW = Math.min(rect.width, window.innerWidth - margin * 2);
+    const pickerH = Math.min(rect.height, window.innerHeight - margin * 2);
+
+    // Prefer anchoring to the task card rather than the mouse point.
+    const anchor = e.currentTarget && e.currentTarget.getBoundingClientRect
+      ? e.currentTarget.getBoundingClientRect()
+      : { left:e.clientX, right:e.clientX, top:e.clientY, bottom:e.clientY };
+
+    let x = anchor.left;
+    if (x + pickerW > window.innerWidth - margin) {
+      x = window.innerWidth - pickerW - margin;
+    }
+    x = Math.max(margin, x);
+
+    const roomBelow = window.innerHeight - anchor.bottom - margin;
+    const roomAbove = anchor.top - margin;
+    let y;
+
+    if (roomBelow >= pickerH) {
+      // Enough room: open downward.
+      y = anchor.bottom + gap;
+    } else if (roomAbove >= pickerH) {
+      // Bottom-of-list task: open upward.
+      y = anchor.top - pickerH - gap;
+    } else {
+      // Very small viewport: use whichever side has more room, then clamp.
+      y = roomAbove > roomBelow
+        ? anchor.top - pickerH - gap
+        : anchor.bottom + gap;
+      y = Math.max(margin, Math.min(y, window.innerHeight - pickerH - margin));
+    }
+
+    picker.style.left = x + 'px';
+    picker.style.top = y + 'px';
+    picker.style.visibility = 'visible';
+  });
 }
 
 function closePicker() {
