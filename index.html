@@ -669,7 +669,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v22-smart-popup</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v23-position-fix</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -1508,6 +1508,7 @@ document.getElementById('saveTask').addEventListener('click', () => {
   if (type === 'one-off' && !date) { alert('Please select a date for the one-off task.'); return; }
 
   let order = parseInt(document.getElementById('taskOrder').value);
+  const requestedPosition = (!isNaN(order) && order >= 1) ? order : null;
 
   if (type === 'one-off') {
     // Position is relative to the tasks actually visible on this date.
@@ -1540,6 +1541,25 @@ document.getElementById('saveTask').addEventListener('click', () => {
   const newTask = { id: uid(), name, order, type, date };
   tasks.push(newTask);
   tasks.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));
+
+  // Existing per-date drag/manual overrides otherwise cause a newly added recurring
+  // task to be appended at the end. Insert it into each saved date order at the
+  // position the user explicitly requested.
+  if(type === 'recurring' && requestedPosition !== null){
+    Object.keys(dayOrders).forEach(dateStr=>{
+      const seq=Array.isArray(dayOrders[dateStr]) ? dayOrders[dateStr] : [];
+      const visibleIds=seq.filter(id=>{
+        const t=tasks.find(x=>x.id===id);
+        return t && (t.type==='recurring' || (t.type==='one-off' && t.date===dateStr));
+      });
+      const withoutNew=visibleIds.filter(id=>id!==newTask.id);
+      const insertAt=Math.max(0,Math.min(requestedPosition-1,withoutNew.length));
+      withoutNew.splice(insertAt,0,newTask.id);
+      dayOrders[dateStr]=withoutNew;
+    });
+    saveDayOrders(dayOrders);
+  }
+
   saveTasks(tasks);
 
   document.getElementById('addModal').style.display = 'none';
