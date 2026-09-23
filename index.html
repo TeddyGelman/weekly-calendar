@@ -318,6 +318,8 @@
   .status-picker {
     position: fixed;
     z-index: 500;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
@@ -667,7 +669,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v20-no-oneoff-label</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v21-notes</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -792,8 +794,8 @@
 
   <div class="notes-wrap">
     <div class="notes-label">Notes / Instructions</div>
-    <textarea class="notes" id="taskNotes" placeholder="Type notes for this task on this day…"></textarea>
-    <div class="notes-hint">Saved automatically. Notes are per-task, per-day.</div>
+    <textarea class="notes" id="taskNotes" placeholder="Type notes / instructions for this task…"></textarea>
+    <div class="notes-hint">Saved automatically. Recurring-task notes apply to every day; one-off notes stay with that dated task.</div>
   </div>
 
   <div class="picker-sep"></div>
@@ -1300,6 +1302,11 @@ function dragAfter(c,y){return [...c.querySelectorAll('.backlog-item:not(.draggi
 function normalizeBacklog(){backlogSections.forEach(s=>longTasks.filter(t=>t.sectionId===s.id).sort((a,b)=>a.backlogOrder-b.backlogOrder).forEach((t,i)=>t.backlogOrder=i+1))}
 
 // ── STATUS PICKER ────────────────────────────────────────────────
+function noteKeyForTask(taskId,dateStr){
+  const task=tasks.find(t=>t.id===taskId);
+  return task && task.type==='recurring' ? taskId + '_recurring' : taskId + '_' + dateStr;
+}
+
 function openPicker(e, taskId, dateStr) {
   e.stopPropagation();
   pickerTarget = { taskId, dateStr };
@@ -1322,11 +1329,20 @@ function openPicker(e, taskId, dateStr) {
     opt.classList.toggle('active', opt.dataset.status === current);
   });
 
-  // Notes
-  const notesKey = taskId + '_' + dateStr;
+  // Notes: recurring tasks share one note across every day; one-offs remain date-specific.
+  const task = tasks.find(t => t.id === taskId);
+  const notesKey = noteKeyForTask(taskId,dateStr);
+  if(task && task.type==='recurring' && notes[notesKey] == null){
+    // Preserve a previously written per-day note when first opening after this upgrade.
+    const legacyKey=taskId+'_'+dateStr;
+    if(notes[legacyKey] != null && notes[legacyKey] !== ''){
+      notes[notesKey]=notes[legacyKey];
+      saveNotes(notes);
+    }
+  }
   document.getElementById('taskNotes').value = notes[notesKey] || '';
 
-  const task = tasks.find(t => t.id === taskId);
+
   document.getElementById('pickerTitle').textContent=task?task.name:'Set Status'; document.getElementById('taskTitleEdit').value=task?task.name:'';
 
   picker.style.display = 'flex';
@@ -1359,7 +1375,7 @@ let titleSaveTimer=null;document.getElementById('taskTitleEdit').addEventListene
 let notesSaveTimer = null;
 document.getElementById('taskNotes').addEventListener('input', (e) => {
   if (!pickerTarget) return;
-  const key = pickerTarget.taskId + '_' + pickerTarget.dateStr;
+  const key = noteKeyForTask(pickerTarget.taskId,pickerTarget.dateStr);
   notes[key] = e.target.value;
   // debounce writes
   clearTimeout(notesSaveTimer);
