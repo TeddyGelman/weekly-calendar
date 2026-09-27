@@ -219,8 +219,9 @@
   .recurring-chevron,.daily-chevron{font-size:10px;transition:transform .15s}
   .recurring-section.open .recurring-chevron,.daily-section.open .daily-chevron{transform:rotate(90deg)}
   .recurring-list,.daily-list{display:none;padding:5px}
+  .daily-section:not(.open) .today-list.daily-list{display:none}
   .recurring-section.open .recurring-list,.daily-section.open .daily-list{display:flex;flex-direction:column;gap:4px}
-  .today-list{display:flex;flex-direction:column;gap:4px}
+  .today-list{flex-direction:column;gap:4px}
   .task-card.calendar-draggable{cursor:grab}
   .task-card.calendar-draggable.dragging{opacity:.42}
   .task-card.calendar-draggable.drag-over{outline:2px dashed var(--accent);outline-offset:2px}
@@ -678,7 +679,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v25-both-collapsible</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v26-daily-fold-fix</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
