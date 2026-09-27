@@ -212,14 +212,14 @@
   }
 
   /* ── TASK CARD ── */
-  .recurring-section{margin:0 8px 8px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)}
-  .recurring-toggle{width:100%;border:0;background:var(--surface2);color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px;cursor:pointer;font:inherit}
-  .recurring-toggle-label{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
-  .recurring-toggle-meta{display:flex;align-items:center;gap:7px;color:var(--text2);font-size:10px}
-  .recurring-chevron{font-size:10px;transition:transform .15s}
-  .recurring-section.open .recurring-chevron{transform:rotate(90deg)}
-  .recurring-list{display:none;padding:5px}
-  .recurring-section.open .recurring-list{display:flex;flex-direction:column;gap:4px}
+  .recurring-section,.daily-section{margin:0 8px 8px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)}
+  .recurring-toggle,.daily-toggle{width:100%;border:0;background:var(--surface2);color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px;cursor:pointer;font:inherit}
+  .recurring-toggle-label,.daily-toggle-label{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+  .recurring-toggle-meta,.daily-toggle-meta{display:flex;align-items:center;gap:7px;color:var(--text2);font-size:10px}
+  .recurring-chevron,.daily-chevron{font-size:10px;transition:transform .15s}
+  .recurring-section.open .recurring-chevron,.daily-section.open .daily-chevron{transform:rotate(90deg)}
+  .recurring-list,.daily-list{display:none;padding:5px}
+  .recurring-section.open .recurring-list,.daily-section.open .daily-list{display:flex;flex-direction:column;gap:4px}
   .today-list{display:flex;flex-direction:column;gap:4px}
   .task-card.calendar-draggable{cursor:grab}
   .task-card.calendar-draggable.dragging{opacity:.42}
@@ -678,7 +678,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v24-collapsible-repeated</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v25-both-collapsible</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -880,10 +880,14 @@ const DUE_KEY='wc_due_v1'; const BACKLOG_SECTIONS_KEY='wc_backlog_sections_v1';
 const VIEW_KEY = 'wc_view_v1';
 const DAY_ORDER_KEY = 'wc_day_order_v1';
 const RECURRING_COLLAPSE_KEY = 'wc_recurring_collapse_v1';
+const DAILY_COLLAPSE_KEY = 'wc_daily_collapse_v1';
 
 function loadRecurringCollapse(){try{return JSON.parse(localStorage.getItem(RECURRING_COLLAPSE_KEY)||'{}')}catch{return {}}}
 function saveRecurringCollapse(v){localStorage.setItem(RECURRING_COLLAPSE_KEY,JSON.stringify(v));}
 let recurringCollapse=loadRecurringCollapse();
+function loadDailyCollapse(){try{return JSON.parse(localStorage.getItem(DAILY_COLLAPSE_KEY)||'{}')}catch{return {}}}
+function saveDailyCollapse(v){localStorage.setItem(DAILY_COLLAPSE_KEY,JSON.stringify(v));}
+let dailyCollapse=loadDailyCollapse();
 
 function loadDayOrders(){try{return JSON.parse(localStorage.getItem(DAY_ORDER_KEY)||'{}')}catch{return {}}}
 function saveDayOrders(v){localStorage.setItem(DAY_ORDER_KEY,JSON.stringify(v));scheduleCloudSync();}
@@ -1113,7 +1117,13 @@ function render() {
         </button>
         <div class="tasks-list recurring-list" id="recurring-${dateStr}"></div>
       </div>
-      <div class="tasks-list today-list" id="tasks-${dateStr}"></div>
+      <div class="daily-section ${dailyCollapse[dateStr] ? '' : 'open'}">
+        <button class="daily-toggle" type="button" aria-expanded="${dailyCollapse[dateStr] ? 'false' : 'true'}">
+          <span class="daily-toggle-label">Today's tasks</span>
+          <span class="daily-toggle-meta"><span class="daily-count"></span><span class="daily-chevron">▶</span></span>
+        </button>
+        <div class="tasks-list today-list daily-list" id="tasks-${dateStr}"></div>
+      </div>
       <div class="add-oneoff-btn" data-date="${dateStr}">+ task for this day</div>
       <div class="day-rating">
         <div class="rating-label">How did I do?</div>
@@ -1128,6 +1138,15 @@ function render() {
     const recurringTasks = dayTasks.filter(t=>t.type==='recurring');
     const oneOffTasks = dayTasks.filter(t=>t.type==='one-off');
     col.querySelector('.recurring-count').textContent = recurringTasks.length + (recurringTasks.length===1?' task':' tasks');
+    col.querySelector('.daily-count').textContent = oneOffTasks.length + (oneOffTasks.length===1?' task':' tasks');
+    col.querySelector('.daily-toggle').addEventListener('click',e=>{
+      e.preventDefault();e.stopPropagation();
+      const section=col.querySelector('.daily-section');
+      const isOpen=section.classList.toggle('open');
+      dailyCollapse[dateStr]=!isOpen;
+      saveDailyCollapse(dailyCollapse);
+      e.currentTarget.setAttribute('aria-expanded',isOpen?'true':'false');
+    });
     col.querySelector('.recurring-toggle').addEventListener('click',e=>{
       e.preventDefault();e.stopPropagation();
       const section=col.querySelector('.recurring-section');
