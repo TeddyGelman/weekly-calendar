@@ -212,6 +212,15 @@
   }
 
   /* ── TASK CARD ── */
+  .recurring-section{margin:0 8px 8px;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surface)}
+  .recurring-toggle{width:100%;border:0;background:var(--surface2);color:var(--text);display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 9px;cursor:pointer;font:inherit}
+  .recurring-toggle-label{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+  .recurring-toggle-meta{display:flex;align-items:center;gap:7px;color:var(--text2);font-size:10px}
+  .recurring-chevron{font-size:10px;transition:transform .15s}
+  .recurring-section.open .recurring-chevron{transform:rotate(90deg)}
+  .recurring-list{display:none;padding:5px}
+  .recurring-section.open .recurring-list{display:flex;flex-direction:column;gap:4px}
+  .today-list{display:flex;flex-direction:column;gap:4px}
   .task-card.calendar-draggable{cursor:grab}
   .task-card.calendar-draggable.dragging{opacity:.42}
   .task-card.calendar-draggable.drag-over{outline:2px dashed var(--accent);outline-offset:2px}
@@ -669,7 +678,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v23-position-fix</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v24-collapsible-repeated</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -870,6 +879,11 @@ const RATINGS_KEY = 'wc_ratings_v1';
 const DUE_KEY='wc_due_v1'; const BACKLOG_SECTIONS_KEY='wc_backlog_sections_v1';
 const VIEW_KEY = 'wc_view_v1';
 const DAY_ORDER_KEY = 'wc_day_order_v1';
+const RECURRING_COLLAPSE_KEY = 'wc_recurring_collapse_v1';
+
+function loadRecurringCollapse(){try{return JSON.parse(localStorage.getItem(RECURRING_COLLAPSE_KEY)||'{}')}catch{return {}}}
+function saveRecurringCollapse(v){localStorage.setItem(RECURRING_COLLAPSE_KEY,JSON.stringify(v));}
+let recurringCollapse=loadRecurringCollapse();
 
 function loadDayOrders(){try{return JSON.parse(localStorage.getItem(DAY_ORDER_KEY)||'{}')}catch{return {}}}
 function saveDayOrders(v){localStorage.setItem(DAY_ORDER_KEY,JSON.stringify(v));scheduleCloudSync();}
@@ -1017,7 +1031,8 @@ function dragTaskOnDate(movingId,targetId,dateStr,placeAfter=false){
 
 
 function setTaskPositionOnDate(taskId,dateStr,position){
-  const visible=tasks.filter(t=>t.type==='recurring'||(t.type==='one-off'&&t.date===dateStr))
+  const positionTask=tasks.find(t=>t.id===taskId); if(!positionTask)return;
+  const visible=tasks.filter(t=>positionTask.type==='recurring' ? t.type==='recurring' : (t.type==='one-off'&&t.date===dateStr))
     .sort((a,b)=>{
       const seq=dayOrders[dateStr];
       if(Array.isArray(seq)){
@@ -1091,8 +1106,15 @@ function render() {
         <div class="due-head"><div class="due-label">Due</div><button class="due-add" type="button">+ Add</button></div>
         <div class="due-list"></div>
       </div>
-      <div class="tasks-list" id="tasks-${dateStr}"></div>
-      <div class="add-oneoff-btn" data-date="${dateStr}">+ one-off</div>
+      <div class="recurring-section ${recurringCollapse[dateStr] ? '' : 'open'}">
+        <button class="recurring-toggle" type="button" aria-expanded="${recurringCollapse[dateStr] ? 'false' : 'true'}">
+          <span class="recurring-toggle-label">Repeated tasks</span>
+          <span class="recurring-toggle-meta"><span class="recurring-count"></span><span class="recurring-chevron">▶</span></span>
+        </button>
+        <div class="tasks-list recurring-list" id="recurring-${dateStr}"></div>
+      </div>
+      <div class="tasks-list today-list" id="tasks-${dateStr}"></div>
+      <div class="add-oneoff-btn" data-date="${dateStr}">+ task for this day</div>
       <div class="day-rating">
         <div class="rating-label">How did I do?</div>
         <div class="stars" data-date="${dateStr}">${[1,2,3,4,5].map(n => `<button class="star ${n <= (ratings[dateStr] || 0) ? 'filled' : ''}" data-rating="${n}" title="${n} star${n>1?'s':''}">★</button>`).join('')}</div>
@@ -1101,22 +1123,40 @@ function render() {
 
     renderDueItems(col,dateStr);
     col.querySelector('.due-add').addEventListener('click',e=>{e.preventDefault();e.stopPropagation();addDueItem(dateStr);});
-    const list = col.querySelector('.tasks-list');
-    list.addEventListener('dragover',e=>e.preventDefault());
-    list.addEventListener('drop',e=>{
-      if(e.target.closest('.task-card'))return;
-      e.preventDefault();
-      let d; try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}
-      if(!d || d.dateStr!==dateStr)return;
-      const visible=dayTasks.filter(t=>t.id!==d.taskId);
-      const last=visible[visible.length-1];
-      if(last)dragTaskOnDate(d.taskId,last.id,dateStr,true);
+    const recurringList = col.querySelector('.recurring-list');
+    const todayList = col.querySelector('.today-list');
+    const recurringTasks = dayTasks.filter(t=>t.type==='recurring');
+    const oneOffTasks = dayTasks.filter(t=>t.type==='one-off');
+    col.querySelector('.recurring-count').textContent = recurringTasks.length + (recurringTasks.length===1?' task':' tasks');
+    col.querySelector('.recurring-toggle').addEventListener('click',e=>{
+      e.preventDefault();e.stopPropagation();
+      const section=col.querySelector('.recurring-section');
+      const isOpen=section.classList.toggle('open');
+      recurringCollapse[dateStr]=!isOpen;
+      saveRecurringCollapse(recurringCollapse);
+      e.currentTarget.setAttribute('aria-expanded',isOpen?'true':'false');
     });
 
-    if (dayTasks.length === 0) {
-      list.innerHTML = '<div class="empty-col">No tasks</div>';
-    } else {
-      dayTasks.forEach((t, dayIndex) => {
+    function attachDropZone(list,subset){
+      list.addEventListener('dragover',e=>e.preventDefault());
+      list.addEventListener('drop',e=>{
+        if(e.target.closest('.task-card'))return;
+        e.preventDefault();
+        let d; try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}
+        if(!d || d.dateStr!==dateStr)return;
+        const moving=tasks.find(t=>t.id===d.taskId);
+        if(!moving)return;
+        // Keep recurring tasks in the recurring section and one-offs in Today's Tasks.
+        if((list===recurringList && moving.type!=='recurring') || (list===todayList && moving.type!=='one-off'))return;
+        const visible=subset.filter(t=>t.id!==d.taskId);
+        const last=visible[visible.length-1];
+        if(last)dragTaskOnDate(d.taskId,last.id,dateStr,true);
+      });
+    }
+    attachDropZone(recurringList,recurringTasks);
+    attachDropZone(todayList,oneOffTasks);
+
+    function renderTaskCard(t, displayIndex, list){
         const statusKey = t.id + '_' + dateStr;
         const status = statuses[statusKey] || 'not-started';
         const card = document.createElement('div');
@@ -1133,12 +1173,11 @@ function render() {
           <div class="task-dot"></div>
           <div class="task-info">
             <div class="task-name">${escHtml(t.name)}</div>
-            <div class="task-order-badge">#${dayIndex + 1}</div>
+            <div class="task-order-badge">#${displayIndex + 1}</div>
           </div>
           <button class="task-delete" title="Delete task" aria-label="Delete task">&times;</button>
         `;
         card.addEventListener('dragstart',e=>{
-          // Buttons remain clickable without accidentally beginning a drag.
           if(e.target.closest('button')){e.preventDefault();return;}
           card.classList.add('dragging');
           e.dataTransfer.effectAllowed='move';
@@ -1150,23 +1189,48 @@ function render() {
         });
         card.addEventListener('dragover',e=>{
           e.preventDefault();
-          if(!card.classList.contains('dragging'))card.classList.add('drag-over');
+          const movingId=(()=>{try{return JSON.parse(e.dataTransfer.getData('text/plain')).taskId}catch{return null}})();
+          const moving=tasks.find(x=>x.id===movingId);
+          if(moving && moving.type===t.type && !card.classList.contains('dragging'))card.classList.add('drag-over');
           e.dataTransfer.dropEffect='move';
         });
         card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));
         card.addEventListener('drop',e=>{
           e.preventDefault(); e.stopPropagation(); card.classList.remove('drag-over');
           let d; try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}
-          if(!d || d.dateStr!==dateStr || d.taskId===t.id)return;
+          const moving=tasks.find(x=>x.id===d.taskId);
+          if(!d || d.dateStr!==dateStr || d.taskId===t.id || !moving || moving.type!==t.type)return;
           const r=card.getBoundingClientRect();
           dragTaskOnDate(d.taskId,t.id,dateStr,e.clientY > r.top+r.height/2);
         });
-        card.querySelector('.move-up').addEventListener('click',e=>{e.stopPropagation();moveTaskOnDate(t.id,dateStr,-1);});
-        card.querySelector('.move-down').addEventListener('click',e=>{e.stopPropagation();moveTaskOnDate(t.id,dateStr,1);});
+        // Arrows reorder within the visible section, not across recurring/one-off sections.
+        card.querySelector('.move-up').addEventListener('click',e=>{
+          e.stopPropagation();
+          const subset=(t.type==='recurring'?recurringTasks:oneOffTasks);
+          const idx=subset.findIndex(x=>x.id===t.id);
+          if(idx>0)dragTaskOnDate(t.id,subset[idx-1].id,dateStr,false);
+        });
+        card.querySelector('.move-down').addEventListener('click',e=>{
+          e.stopPropagation();
+          const subset=(t.type==='recurring'?recurringTasks:oneOffTasks);
+          const idx=subset.findIndex(x=>x.id===t.id);
+          if(idx>=0 && idx<subset.length-1)dragTaskOnDate(t.id,subset[idx+1].id,dateStr,true);
+        });
         card.addEventListener('click', (e) => openPicker(e, t.id, dateStr));
         card.querySelector('.task-delete').addEventListener('click', (e) => { e.stopPropagation(); deleteTask(t.id); });
         list.appendChild(card);
-      });
+    }
+
+    if(recurringTasks.length===0){
+      recurringList.innerHTML='<div class="empty-col">No repeated tasks</div>';
+    }else{
+      recurringTasks.forEach((t,idx)=>renderTaskCard(t,idx,recurringList));
+    }
+
+    if(oneOffTasks.length===0){
+      todayList.innerHTML='<div class="empty-col">No tasks assigned for this day</div>';
+    }else{
+      oneOffTasks.forEach((t,idx)=>renderTaskCard(t,idx,todayList));
     }
 
     col.querySelector('.add-oneoff-btn').addEventListener('click', () => openAddModal(dateStr));
@@ -1310,7 +1374,8 @@ function noteKeyForTask(taskId,dateStr){
 function openPicker(e, taskId, dateStr) {
   e.stopPropagation();
   pickerTarget = { taskId, dateStr };
-  const orderedForDate=tasks.filter(t=>t.type==='recurring'||(t.type==='one-off'&&t.date===dateStr))
+  const positionTask=tasks.find(t=>t.id===taskId);
+  const orderedForDate=tasks.filter(t=>positionTask && (positionTask.type==='recurring' ? t.type==='recurring' : (t.type==='one-off'&&t.date===dateStr)))
     .sort((a,b)=>{
       const seq=dayOrders[dateStr];
       if(Array.isArray(seq)){
@@ -1321,6 +1386,8 @@ function openPicker(e, taskId, dateStr) {
     });
   const positionInput=document.getElementById('taskPositionEdit');
   positionInput.value=Math.max(1,orderedForDate.findIndex(t=>t.id===taskId)+1);
+  const posLabel=document.querySelector('#statusPicker .notes-wrap:nth-of-type(2) .notes-label');
+  if(posLabel)posLabel.textContent=positionTask && positionTask.type==='recurring'?'Position in repeated tasks':'Position in tasks for this day';
   const picker = document.getElementById('statusPicker');
 
   const statusKey = taskId + '_' + dateStr;
