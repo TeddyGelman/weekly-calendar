@@ -221,6 +221,10 @@
   .recurring-list,.daily-list{display:none;padding:5px}
   .daily-section:not(.open) .today-list.daily-list{display:none}
   .recurring-section.open .recurring-list,.daily-section.open .daily-list{display:flex;flex-direction:column;gap:4px}
+  .section-rating{display:none;border-top:1px solid var(--border);padding:7px 8px 8px}
+  .recurring-section.open .recurring-rating,.daily-section.open .daily-rating{display:block}
+  .section-rating .stars{justify-content:center}
+
   .today-list{flex-direction:column;gap:4px}
   .task-card.calendar-draggable{cursor:grab}
   .task-card.calendar-draggable.dragging{opacity:.42}
@@ -679,7 +683,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v26-daily-fold-fix</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v27-section-ratings</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -1117,6 +1121,9 @@ function render() {
           <span class="recurring-toggle-meta"><span class="recurring-count"></span><span class="recurring-chevron">▶</span></span>
         </button>
         <div class="tasks-list recurring-list" id="recurring-${dateStr}"></div>
+        <div class="section-rating recurring-rating">
+          <div class="stars" data-rating-kind="recurring" data-date="${dateStr}">${[1,2,3,4,5].map(n => `<button class="star ${n <= (ratings[dateStr+'_recurring'] || 0) ? 'filled' : ''}" data-rating="${n}" title="${n} star${n>1?'s':''}">★</button>`).join('')}</div>
+        </div>
       </div>
       <div class="daily-section ${dailyCollapse[dateStr] ? '' : 'open'}">
         <button class="daily-toggle" type="button" aria-expanded="${dailyCollapse[dateStr] ? 'false' : 'true'}">
@@ -1124,12 +1131,11 @@ function render() {
           <span class="daily-toggle-meta"><span class="daily-count"></span><span class="daily-chevron">▶</span></span>
         </button>
         <div class="tasks-list today-list daily-list" id="tasks-${dateStr}"></div>
+        <div class="section-rating daily-rating">
+          <div class="stars" data-rating-kind="daily" data-date="${dateStr}">${[1,2,3,4,5].map(n => `<button class="star ${n <= (ratings[dateStr+'_daily'] || 0) ? 'filled' : ''}" data-rating="${n}" title="${n} star${n>1?'s':''}">★</button>`).join('')}</div>
+        </div>
       </div>
       <div class="add-oneoff-btn" data-date="${dateStr}">+ task for this day</div>
-      <div class="day-rating">
-        <div class="rating-label">How did I do?</div>
-        <div class="stars" data-date="${dateStr}">${[1,2,3,4,5].map(n => `<button class="star ${n <= (ratings[dateStr] || 0) ? 'filled' : ''}" data-rating="${n}" title="${n} star${n>1?'s':''}">★</button>`).join('')}</div>
-      </div>
     `;
 
     renderDueItems(col,dateStr);
@@ -1254,8 +1260,14 @@ function render() {
     }
 
     col.querySelector('.add-oneoff-btn').addEventListener('click', () => openAddModal(dateStr));
-    col.querySelectorAll('.star').forEach(star => star.addEventListener('click', () => {
-      const n = Number(star.dataset.rating); ratings[dateStr] = ratings[dateStr] === n ? 0 : n; saveRatings(ratings); render();
+    col.querySelectorAll('.section-rating .star').forEach(star => star.addEventListener('click', () => {
+      const n = Number(star.dataset.rating);
+      const wrap=star.closest('.stars');
+      const kind=wrap.dataset.ratingKind;
+      const key=dateStr+'_'+kind;
+      ratings[key] = ratings[key] === n ? 0 : n;
+      saveRatings(ratings);
+      render();
     }));
     grid.appendChild(col);
   }
