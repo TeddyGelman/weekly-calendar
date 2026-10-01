@@ -682,7 +682,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v28-ratings-always-visible</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v29-folded-default</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -1114,8 +1114,8 @@ function render() {
         <div class="due-head"><div class="due-label">Due</div><button class="due-add" type="button">+ Add</button></div>
         <div class="due-list"></div>
       </div>
-      <div class="recurring-section ${recurringCollapse[dateStr] ? '' : 'open'}">
-        <button class="recurring-toggle" type="button" aria-expanded="${recurringCollapse[dateStr] ? 'false' : 'true'}">
+      <div class="recurring-section ${recurringCollapse[dateStr] === false ? 'open' : ''}">
+        <button class="recurring-toggle" type="button" aria-expanded="${recurringCollapse[dateStr] === false ? 'true' : 'false'}">
           <span class="recurring-toggle-label">Repeated tasks</span>
           <span class="recurring-toggle-meta"><span class="recurring-count"></span><span class="recurring-chevron">▶</span></span>
         </button>
@@ -1124,8 +1124,8 @@ function render() {
           <div class="stars" data-rating-kind="recurring" data-date="${dateStr}">${[1,2,3,4,5].map(n => `<button class="star ${n <= (ratings[dateStr+'_recurring'] || 0) ? 'filled' : ''}" data-rating="${n}" title="${n} star${n>1?'s':''}">★</button>`).join('')}</div>
         </div>
       </div>
-      <div class="daily-section ${dailyCollapse[dateStr] ? '' : 'open'}">
-        <button class="daily-toggle" type="button" aria-expanded="${dailyCollapse[dateStr] ? 'false' : 'true'}">
+      <div class="daily-section ${dailyCollapse[dateStr] === false ? 'open' : ''}">
+        <button class="daily-toggle" type="button" aria-expanded="${dailyCollapse[dateStr] === false ? 'true' : 'false'}">
           <span class="daily-toggle-label">Today's tasks</span>
           <span class="daily-toggle-meta"><span class="daily-count"></span><span class="daily-chevron">▶</span></span>
         </button>
