@@ -695,6 +695,10 @@
   @media(max-width:1200px){.lifetime-group{grid-template-columns:minmax(145px,.8fr) minmax(135px,1fr) auto;gap:6px 10px}.life-statuses{gap:8px}.life-statuses span{min-width:42px}}
   @media(max-width:900px){.lifetime-bar{margin:6px 8px;overflow-x:auto}.lifetime-group{min-width:560px}.lifetime-divider{flex:0 0 1px}}
   @media(max-width:700px){.lifetime-bar{display:block;padding:7px 9px;overflow:visible}.lifetime-group{min-width:0;grid-template-columns:1fr auto;padding:5px 2px}.life-statuses{grid-column:1/3;grid-row:auto;justify-content:space-between;border-top:1px solid var(--border);padding-top:6px}.life-progress{grid-column:1/3;margin-top:0}.lifetime-divider{width:100%;height:1px;margin:5px 0}.lifetime-kind{font-size:10px}.life-icon{font-size:17px}}
+.positive-lifetime{min-height:48px;padding:7px 12px}.positive-lifetime .completion-total{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 12px;flex:1}
+.completed-total small{font-size:9px;color:var(--text2);margin-left:3px;font-weight:650}
+.completed-total small.up{color:#a78bfa}.completed-total small.down{color:var(--text2)}.completed-total{display:flex;align-items:baseline;gap:7px;white-space:nowrap}.completed-total strong{font-size:22px;line-height:1;color:var(--text);font-weight:800}.completed-total span{font-size:10px;color:var(--text2);font-weight:650}@media(max-width:700px){.positive-lifetime{display:block}.positive-lifetime .completion-total{min-width:0;display:flex;padding:7px 2px}.completed-total strong{font-size:20px}}
+.milestone-toast{position:fixed;left:50%;top:18px;transform:translate(-50%,-18px);opacity:0;z-index:3000;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;box-shadow:0 10px 30px rgba(0,0,0,.4);display:flex;flex-direction:column;align-items:center;gap:2px;transition:.25s;pointer-events:none}.milestone-toast.show{opacity:1;transform:translate(-50%,0)}.milestone-toast strong{font-size:13px}.milestone-toast span{font-size:9px;color:var(--text2)}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -705,7 +709,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v33-scrollable-hover-gradient</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v35-weekly-milestones</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -752,30 +756,12 @@
 </div>
 
 <!-- MAIN -->
-<div class="lifetime-bar" id="lifetimeBar">
-  <div class="lifetime-group">
-    <div class="lifetime-kind"><span class="life-icon recurring-icon">↻</span><span>Repeated Tasks <em>(Lifetime)</em></span></div>
-    <div class="lifetime-main"><strong id="lifeRecurringDone">0</strong><span class="life-slash"> / </span><span id="lifeRecurringTotal">0</span><span class="life-percent" id="lifeRecurringPct">0%</span></div>
-    <div class="life-progress"><div id="lifeRecurringFill"></div></div>
-    <div class="life-statuses">
-      <button class="life-stat" data-kind="recurring" data-status="complete"><i class="life-dot complete"></i><b id="lifeRecurringComplete">0</b><small>Done</small></button>
-      <button class="life-stat" data-kind="recurring" data-status="wait"><i class="life-dot wait"></i><b id="lifeRecurringWait">0</b><small>Wait</small></button>
-      <button class="life-stat" data-kind="recurring" data-status="action"><i class="life-dot action"></i><b id="lifeRecurringAction">0</b><small>Act now</small></button>
-      <button class="life-stat" data-kind="recurring" data-status="not-started"><i class="life-dot notstarted"></i><b id="lifeRecurringNot">0</b><small>Not done</small></button>
-    </div>
-  </div>
-  <div class="lifetime-divider"></div>
-  <div class="lifetime-group">
-    <div class="lifetime-kind"><span class="life-icon daily-icon">☀</span><span>Today's Tasks <em>(Lifetime)</em></span></div>
-    <div class="lifetime-main"><strong id="lifeDailyDone">0</strong><span class="life-slash"> / </span><span id="lifeDailyTotal">0</span><span class="life-percent" id="lifeDailyPct">0%</span></div>
-    <div class="life-progress"><div id="lifeDailyFill"></div></div>
-    <div class="life-statuses">
-      <button class="life-stat" data-kind="daily" data-status="complete"><i class="life-dot complete"></i><b id="lifeDailyComplete">0</b><small>Done</small></button>
-      <button class="life-stat" data-kind="daily" data-status="wait"><i class="life-dot wait"></i><b id="lifeDailyWait">0</b><small>Wait</small></button>
-      <button class="life-stat" data-kind="daily" data-status="action"><i class="life-dot action"></i><b id="lifeDailyAction">0</b><small>Act now</small></button>
-      <button class="life-stat" data-kind="daily" data-status="not-started"><i class="life-dot notstarted"></i><b id="lifeDailyNot">0</b><small>Not done</small></button>
-    </div>
-  </div>
+<div class="lifetime-bar positive-lifetime" id="lifetimeBar">
+<div class="lifetime-group completion-total"><div class="lifetime-kind"><span class="life-icon recurring-icon">↻</span><span>Repeated Tasks <em>(Lifetime)</em></span></div><div class="completed-total"><strong id="lifeRecurringDone">0</strong><span>tasks completed</span></div></div>
+<div class="lifetime-divider"></div>
+<div class="lifetime-group completion-total"><div class="lifetime-kind"><span class="life-icon daily-icon">☀</span><span>Today's Tasks <em>(Lifetime)</em></span></div><div class="completed-total"><strong id="lifeDailyDone">0</strong><span>tasks completed</span></div></div>
+<div class="lifetime-divider"></div>
+<div class="lifetime-group completion-total weekly-total"><div class="lifetime-kind"><span class="life-icon">✓</span><span>This Week</span></div><div class="completed-total"><strong id="weekDone">0</strong><span>completed</span><small id="weekCompare"></small></div></div>
 </div>
 <div class="life-tooltip" id="lifeTooltip"></div>
 <div class="main">
@@ -938,6 +924,7 @@ const RECURRING_COLLAPSE_KEY = 'wc_recurring_collapse_v1';
 const DAILY_COLLAPSE_KEY = 'wc_daily_collapse_v1';
 const TASK_TYPE_LEDGER_KEY = 'wc_task_type_ledger_v1';
 const TASK_CREATED_LEDGER_KEY = 'wc_task_created_ledger_v1';
+const MILESTONE_KEY = 'wc_completion_milestone_v1';
 
 function loadRecurringCollapse(){try{return JSON.parse(localStorage.getItem(RECURRING_COLLAPSE_KEY)||'{}')}catch{return {}}}
 function saveRecurringCollapse(v){localStorage.setItem(RECURRING_COLLAPSE_KEY,JSON.stringify(v));}
@@ -1153,32 +1140,39 @@ function buildLifetimeOccurrences(){
  return out;
 }
 let lifetimeOccurrences=[];
+function completionCountBetween(startDate,endDate){
+ return lifetimeOccurrences.filter(x=>x.status==='complete'&&x.date>=startDate&&x.date<=endDate).length;
+}
+function maybeShowCompletionMilestone(total){
+ const marks=[100,250,500,1000,2500,5000,10000,25000,50000];
+ let last=Number(localStorage.getItem(MILESTONE_KEY)||0);
+ const reached=marks.filter(m=>m<=total&&m>last);
+ if(!reached.length)return;
+ const mark=reached[reached.length-1];
+ localStorage.setItem(MILESTONE_KEY,String(mark));
+ const toast=document.createElement('div');
+ toast.className='milestone-toast';
+ toast.innerHTML='<strong>🏆 '+mark.toLocaleString()+' tasks completed!</strong><span>Lifetime milestone</span>';
+ document.body.appendChild(toast);
+ requestAnimationFrame(()=>toast.classList.add('show'));
+ setTimeout(()=>{toast.classList.remove('show');setTimeout(()=>toast.remove(),300)},3200);
+}
 function renderLifetimeStats(){
  lifetimeOccurrences=buildLifetimeOccurrences();
- const bs={recurring:{complete:0,wait:0,action:0,notStarted:0,total:0},daily:{complete:0,wait:0,action:0,notStarted:0,total:0}};
- lifetimeOccurrences.forEach(x=>{const q=bs[x.kind];q.total++;if(x.status==='complete')q.complete++;else if(x.status==='wait')q.wait++;else if(x.status==='action')q.action++;else q.notStarted++;});
- const set=(p,q)=>{const pct=q.total?Math.round(q.complete/q.total*100):0;document.getElementById(p+'Done').textContent=q.complete;document.getElementById(p+'Total').textContent=q.total;document.getElementById(p+'Pct').textContent=pct+'%';document.getElementById(p+'Fill').style.width=pct+'%';document.getElementById(p+'Complete').textContent=q.complete;document.getElementById(p+'Wait').textContent=q.wait;document.getElementById(p+'Action').textContent=q.action;document.getElementById(p+'Not').textContent=q.notStarted;};
- set('lifeRecurring',bs.recurring);set('lifeDaily',bs.daily);
+ let recurringDone=0,dailyDone=0;
+ lifetimeOccurrences.forEach(x=>{if(x.status!=='complete')return;if(x.kind==='recurring')recurringDone++;else if(x.kind==='daily')dailyDone++;});
+ document.getElementById('lifeRecurringDone').textContent=recurringDone;
+ document.getElementById('lifeDailyDone').textContent=dailyDone;
+
+ const today=new Date(), mon=weekStart(today), thisStart=fmtDate(mon), thisEnd=fmtDate(addDays(mon,6));
+ const prevMon=addDays(mon,-7), prevStart=fmtDate(prevMon), prevEnd=fmtDate(addDays(prevMon,6));
+ const thisWeek=completionCountBetween(thisStart,thisEnd), lastWeek=completionCountBetween(prevStart,prevEnd), diff=thisWeek-lastWeek;
+ document.getElementById('weekDone').textContent=thisWeek;
+ const cmp=document.getElementById('weekCompare');
+ cmp.textContent=diff===0?'same as last week':(diff>0?'↑ '+diff+' vs last week':'↓ '+Math.abs(diff)+' vs last week');
+ cmp.className=diff>0?'up':(diff<0?'down':'');
+ maybeShowCompletionMilestone(recurringDone+dailyDone);
 }
-function showLifetimeTooltip(btn){
- const tip=document.getElementById('lifeTooltip'),kind=btn.dataset.kind,status=btn.dataset.status;
- const rows=lifetimeOccurrences.filter(x=>x.kind===kind&&x.status===status).sort((a,b)=>b.date.localeCompare(a.date));
- const labels={complete:'Done',wait:'Wait',action:'Act now','not-started':'Not done'},kl=kind==='recurring'?'repeated':'today’s';
- tip.innerHTML='<div class="life-tooltip-title">'+rows.length+' '+kl+' task'+(rows.length===1?'':'s')+' — '+labels[status]+'</div>'+(rows.length?rows.map(x=>'<div class="life-tooltip-item">'+escHtml(x.name)+'<span class="life-tooltip-date">'+x.date+'</span></div>').join(''):'<div style="color:var(--text2)">No tasks in this category.</div>');
- tip.classList.add('show');const r=btn.getBoundingClientRect(),tr=tip.getBoundingClientRect();let left=Math.max(12,Math.min(r.left+r.width/2-tr.width/2,window.innerWidth-tr.width-12)),top=r.bottom+7;if(top+tr.height>window.innerHeight-12)top=Math.max(12,r.top-tr.height-7);tip.style.left=left+'px';tip.style.top=top+'px';
-}
-let lifeTooltipHideTimer=null;
-function scheduleLifetimeTooltipHide(){
-  clearTimeout(lifeTooltipHideTimer);
-  lifeTooltipHideTimer=setTimeout(()=>document.getElementById('lifeTooltip').classList.remove('show'),180);
-}
-document.querySelectorAll('.life-stat').forEach(btn=>{
-  btn.addEventListener('mouseenter',()=>{clearTimeout(lifeTooltipHideTimer);showLifetimeTooltip(btn);});
-  btn.addEventListener('mouseleave',scheduleLifetimeTooltipHide);
-});
-const lifeTooltipEl=document.getElementById('lifeTooltip');
-lifeTooltipEl.addEventListener('mouseenter',()=>clearTimeout(lifeTooltipHideTimer));
-lifeTooltipEl.addEventListener('mouseleave',scheduleLifetimeTooltipHide);
 
 function render() {
   document.getElementById('weekLabel').textContent = calendarView === 'day' ? (DAY_NAMES[(selectedDay.getDay()+6)%7] + ', ' + MONTHS[selectedDay.getMonth()] + ' ' + selectedDay.getDate() + ', ' + selectedDay.getFullYear()) : fmtWeekLabel(currentMonday);
