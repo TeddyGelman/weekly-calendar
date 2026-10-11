@@ -721,6 +721,25 @@
 .review-best{display:grid;grid-template-columns:100px 1fr;align-items:center;margin-top:10px;min-height:116px;border:1px solid #fbbf24;border-radius:11px;background:radial-gradient(circle at 15% 50%,rgba(251,191,36,.17),rgba(251,191,36,.025) 45%,transparent 75%);box-shadow:inset 0 0 24px rgba(251,191,36,.04)}.review-trophy{display:grid;place-items:center}.review-trophy svg{width:54px;height:54px;fill:none;stroke:#fbbf24;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 8px rgba(251,191,36,.28))}.review-best-copy{display:flex;flex-direction:column;align-items:center;text-align:center;padding:12px;border-left:1px solid rgba(251,191,36,.25)}.review-best-copy span{font-size:9px;letter-spacing:1.4px;color:var(--text2);font-weight:800}.review-best-copy strong{font-size:24px;margin:4px 0 2px}.review-best-copy em{font-size:12px;color:#fbbf24;font-style:normal;font-weight:700}
 #reviewModal .modal-actions{margin-top:12px}
 @media(max-width:700px){#reviewModal .planner-wide-modal{padding:13px}#reviewTitle{font-size:18px}.review-total-wrap{grid-template-columns:1fr}.review-main-total{border-right:0;border-bottom:1px solid var(--border)}.review-best{grid-template-columns:72px 1fr}.review-trophy svg{width:42px;height:42px}.review-best-copy strong{font-size:17px}.review-equation{font-size:8px}}
+
+/* v45 scrollable week-summary history */
+.review-history{margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+.review-history-head{display:flex;align-items:center;justify-content:space-between;margin:0 2px 8px}
+.review-history-head strong{font-size:12px}.review-history-head span{font-size:9px;color:var(--text2)}
+.review-history-list{display:flex;flex-direction:column;gap:6px}
+.review-history-week{border:1px solid var(--border);border-radius:9px;background:var(--surface2);overflow:hidden}
+.review-history-week summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:minmax(105px,1.15fr) auto minmax(120px,1fr);gap:10px;align-items:center;padding:9px 11px;font-size:10px}
+.review-history-week summary::-webkit-details-marker{display:none}
+.review-history-week summary:after{content:'›';font-size:18px;color:var(--text2);transform:rotate(90deg);justify-self:end;transition:.15s}
+.review-history-week[open] summary:after{transform:rotate(-90deg)}
+.review-history-date{font-weight:750}.review-history-total{font-weight:800;color:#6ee7a8;white-space:nowrap}.review-history-best{color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.review-history-detail{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:0 10px 10px}
+.review-history-stat{padding:7px 8px;border:1px solid var(--border);border-radius:7px;display:flex;flex-direction:column;gap:2px}
+.review-history-stat strong{font-size:15px}.review-history-stat span{font-size:8px;color:var(--text2)}
+.review-history-stat.best{grid-column:span 2;border-color:rgba(251,191,36,.28)}.review-history-stat.best strong{font-size:11px;color:#fbbf24}
+#reviewModal .planner-wide-modal{max-height:min(760px,calc(100vh - 24px));overflow-y:auto}
+@media(max-width:700px){.review-history-week summary{grid-template-columns:1fr auto;padding:9px}.review-history-best{grid-column:1/3}.review-history-detail{grid-template-columns:1fr 1fr}.review-history-stat.best{grid-column:1/3}}
+
 .topbar .icon-only svg{width:14px;height:14px;display:block;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.topbar #utilityBtn svg circle{fill:currentColor;stroke:none}.topbar #searchBtn,.topbar #reviewBtn,.topbar #infoBtn,.topbar #utilityBtn{width:32px;height:30px;padding:0;display:inline-grid;place-items:center;flex:0 0 auto}
 
 /* v41 reliability + compact backlog */
@@ -748,7 +767,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v44-carry-tomorrow</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v45-week-summary-history</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -2062,35 +2081,71 @@ function renderSearchResults(q){
  box.innerHTML=rows.length?rows.slice(0,100).map(r=>`<div class="search-result" data-id="${r.id}" data-live="${r.live}"><div class="search-result-title">${escHtml(r.name)}</div><div class="search-result-meta">${escHtml(r.date||'')}</div>${r.note?`<div class="search-result-note">${escHtml(r.note.slice(0,180))}</div>`:''}</div>`).join(''):'<div class="shortcut-hint">No matches.</div>';
  box.querySelectorAll('.search-result[data-live="true"]').forEach(el=>el.onclick=()=>{const t=tasks.find(x=>x.id===el.dataset.id);if(!t)return;document.getElementById('searchModal').style.display='none';const d=t.type==='one-off'?new Date(t.date+'T12:00:00'):new Date();selectedDay=d;currentMonday=weekStart(d);render();});
 }
-function openWeeklyReview(){
- lifetimeOccurrences=buildLifetimeOccurrences();
- const mon=weekStart(calendarView==='day'?selectedDay:currentMonday),start=fmtDate(mon),end=fmtDate(addDays(mon,6));
+function weeklyReviewStats(mon){
+ const start=fmtDate(mon),end=fmtDate(addDays(mon,6));
  const rows=lifetimeOccurrences.filter(x=>x.date>=start&&x.date<=end),done=rows.filter(x=>x.status==='complete');
  const rec=done.filter(x=>x.kind==='recurring').length,daily=done.filter(x=>x.kind==='daily').length;
  const priorityDone=done.filter(x=>{const t=tasks.find(t=>t.id===x.taskId)||taskArchive[x.taskId];return t&&t.priority}).length;
  const byDay={};done.forEach(x=>byDay[x.date]=(byDay[x.date]||0)+1);
- const best=Object.entries(byDay).sort((a,b)=>b[1]-a[1])[0];
+ const best=Object.entries(byDay).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0];
  const bestDate=best?new Date(best[0]+'T12:00:00'):null;
- const bestLabel=bestDate?bestDate.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'}):'No completed tasks yet';
-
+ return {mon,done:done.length,rec,daily,priorityDone,best,
+   bestLabel:bestDate?bestDate.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'}):'No completed tasks'};
+}
+function historicalWeekSummaries(currentMon){
+ const dates=lifetimeOccurrences.map(x=>x.date).filter(Boolean).sort();
+ if(!dates.length)return [];
+ let first=weekStart(new Date(dates[0]+'T12:00:00'));
+ const out=[],cursor=addDays(currentMon,-7);
+ while(cursor>=first){
+   const st=weeklyReviewStats(cursor);
+   // Include every historical week from the beginning of recorded planner history,
+   // even a zero-completion week, so the timeline is honest and continuous.
+   out.push(st);
+   cursor=addDays(cursor,-7);
+ }
+ return out;
+}
+function historyWeekMarkup(st){
+ const bestShort=st.best?new Date(st.best[0]+'T12:00:00').toLocaleDateString(undefined,{weekday:'long'}):'—';
+ return `<details class="review-history-week">
+   <summary>
+     <span class="review-history-date">${fmtWeekLabel(st.mon)}</span>
+     <span class="review-history-total">${st.done} completed</span>
+     <span class="review-history-best">Best: ${bestShort}${st.best?' · '+st.best[1]:''}</span>
+   </summary>
+   <div class="review-history-detail">
+     <div class="review-history-stat"><strong>${st.rec}</strong><span>repeated</span></div>
+     <div class="review-history-stat"><strong>${st.daily}</strong><span>daily</span></div>
+     <div class="review-history-stat"><strong>${st.priorityDone}</strong><span>priority</span></div>
+     <div class="review-history-stat best"><strong>${st.bestLabel}</strong><span>most productive · ${st.best?st.best[1]:0} completed</span></div>
+   </div>
+ </details>`;
+}
+function openWeeklyReview(){
+ lifetimeOccurrences=buildLifetimeOccurrences();
+ const mon=weekStart(calendarView==='day'?selectedDay:currentMonday),st=weeklyReviewStats(mon);
+ const history=historicalWeekSummaries(mon);
  document.getElementById('reviewTitle').innerHTML='Week Summary <span class="review-range">'+fmtWeekLabel(mon)+'</span>';
  document.getElementById('reviewBody').innerHTML=`
    <div class="review-total-wrap">
-     <div class="review-main-total"><span class="review-check">✓</span><div><strong>${done.length}</strong><span>tasks completed</span></div></div>
+     <div class="review-main-total"><span class="review-check">✓</span><div><strong>${st.done}</strong><span>tasks completed</span></div></div>
      <div class="review-breakdown">
-       <div class="review-break-card repeated"><span class="review-break-icon">↻</span><div><strong>${rec}</strong><span>repeated</span></div></div>
-       <div class="review-break-card daily"><span class="review-break-icon">☀</span><div><strong>${daily}</strong><span>daily</span></div></div>
-       
+       <div class="review-break-card repeated"><span class="review-break-icon">↻</span><div><strong>${st.rec}</strong><span>repeated</span></div></div>
+       <div class="review-break-card daily"><span class="review-break-icon">☀</span><div><strong>${st.daily}</strong><span>daily</span></div></div>
      </div>
    </div>
-   <div class="review-priority"><span class="review-star">★</span><strong>${priorityDone}</strong><span>priority tasks completed</span></div>
+   <div class="review-priority"><span class="review-star">★</span><strong>${st.priorityDone}</strong><span>priority tasks completed</span></div>
    <div class="review-best">
      <div class="review-trophy"><svg viewBox="0 0 64 64" aria-hidden="true"><path d="M20 10h24v10c0 12-5 20-12 20s-12-8-12-20V10Z"/><path d="M20 15H10v5c0 8 5 13 12 13M44 15h10v5c0 8-5 13-12 13M32 40v9M23 54h18M27 49h10"/></svg></div>
-     <div class="review-best-copy"><span>MOST PRODUCTIVE DAY</span><strong>${bestLabel}</strong><em>${best?best[1]:0} tasks completed</em></div>
+     <div class="review-best-copy"><span>MOST PRODUCTIVE DAY</span><strong>${st.bestLabel}</strong><em>${st.best?st.best[1]:0} tasks completed</em></div>
+   </div>
+   <div class="review-history">
+     <div class="review-history-head"><strong>Previous Weeks</strong><span>${history.length?history.length+' week'+(history.length===1?'':'s'):'No earlier history yet'}</span></div>
+     <div class="review-history-list">${history.map(historyWeekMarkup).join('')}</div>
    </div>`;
  document.getElementById('reviewModal').style.display='flex';
 }
-
 document.getElementById('searchBtn').onclick=openSearch;
 document.getElementById('reviewBtn').onclick=()=>{const m=document.getElementById('reviewModal');if(m.style.display==='flex'){m.style.display='none';}else openWeeklyReview();};
 document.getElementById('plannerSearch').addEventListener('input',e=>renderSearchResults(e.target.value));
