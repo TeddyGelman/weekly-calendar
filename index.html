@@ -727,6 +727,10 @@
 .status-picker{width:min(340px,calc(100vw - 18px))!important;max-height:calc(100vh - 20px)!important;overflow-y:auto!important}.status-picker-title{font-size:13px!important;padding:10px 12px 4px!important}.status-picker .notes-wrap{margin:5px 9px!important}.status-picker .notes-hint{display:none}.status-picker .status-option{width:calc(50% - 13px)!important;margin:3px 5px!important;padding:7px!important;font-size:9px!important}.status-picker .picker-actions{grid-template-columns:1fr 1fr!important;padding:5px 9px!important}.status-picker .picker-action{font-size:9px!important;padding:6px!important}.status-picker textarea.notes{min-height:52px!important}.status-picker .picker-del{font-size:9px!important}
 .backlog-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px}.backlog-toolbar-hint{font-size:8px;color:var(--text2);white-space:nowrap}.backlog-section{overflow:hidden!important}.backlog-section-head{display:grid!important;grid-template-columns:18px minmax(0,1fr) auto auto;align-items:center;gap:5px;cursor:grab}.section-grip,.backlog-drag{color:var(--text2);cursor:grab}.backlog-section-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.long-task-item{display:grid!important;grid-template-columns:18px minmax(0,1fr) auto 20px!important;align-items:center!important;gap:6px!important;padding:7px 8px!important}.long-task-text{min-width:0!important;white-space:normal!important;overflow-wrap:break-word!important;word-break:normal!important;line-height:1.25!important;font-size:10px!important}.backlog-schedule{display:flex!important;gap:3px!important;margin:0!important}.backlog-schedule .btn{font-size:8px!important;padding:3px 6px!important;white-space:nowrap!important}.long-task-del{width:20px!important;padding:0!important}.dragging-section{opacity:.45}.section-drop,.backlog-box-drop{outline:1px dashed var(--blue);outline-offset:-2px}.calendar-day-drop{outline:2px dashed var(--blue)!important;outline-offset:-3px}
 @media(max-width:700px){.backlog-toolbar-hint{display:none}.long-task-item{grid-template-columns:16px minmax(0,1fr) 18px!important}.backlog-schedule{grid-column:2/4!important;justify-content:flex-start}.long-task-del{grid-column:3;grid-row:1}.backlog-section-head{grid-template-columns:16px minmax(0,1fr) auto auto}}
+
+/* v42 compact task editor + backlog cleanup */
+.status-picker{width:min(330px,calc(100vw - 16px));max-height:min(520px,calc(100vh - 16px))}
+.status-picker-title{display:none!important}.status-picker .notes-wrap{margin:5px 8px}.status-picker .notes{padding:6px 8px}.status-picker textarea.notes{min-height:48px;max-height:90px}.status-picker .status-option{margin:4px 1px;padding:6px 3px;font-size:8px}.picker-actions{grid-template-columns:1fr 1fr 1fr!important;gap:4px;padding:4px 8px 6px}.picker-action{padding:5px 4px!important;font-size:8px!important}.picker-del{margin:0 8px 7px!important;padding:5px 2px!important}.long-task-item{grid-template-columns:16px minmax(0,1fr) 16px!important}.backlog-schedule{display:none!important}.long-task-del{border:0!important;background:transparent!important;box-shadow:none!important;padding:0!important;width:16px;height:20px;display:grid;place-items:center;font-size:16px;opacity:.65}.long-task-del:hover{opacity:1}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -737,7 +741,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v41-reliable-ui-fix</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v42-drag-undo-polish</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -789,7 +793,7 @@
 <div class="lifetime-divider"></div>
 <div class="lifetime-group completion-total"><div class="lifetime-kind"><span class="life-icon daily-icon">☀</span><span>Today's Tasks <em>(Lifetime)</em></span></div><div class="completed-total"><strong id="lifeDailyDone">0</strong><span>tasks completed</span></div></div>
 <div class="lifetime-divider"></div>
-<div class="lifetime-group completion-total weekly-total"><div class="lifetime-kind"><span class="life-icon">✓</span><span>This Week</span></div><div class="completed-total"><strong id="weekDone">0</strong><span>completed</span><small id="weekCompare"></small></div></div>
+<div class="lifetime-group completion-total weekly-total"><div class="lifetime-kind"><span class="life-icon">✓</span><span>This Week</span></div><div class="completed-total"><strong id="weekDone">0</strong><span>completed</span></div></div>
 </div>
 <div class="life-tooltip" id="lifeTooltip"></div>
 <div class="main">
@@ -1195,6 +1199,17 @@ let selectedDay = new Date();
 let currentMonday = weekStart(new Date());
 let pickerTarget = null; // { taskId, dateStr }
 
+let undoStack=[];
+function captureUndo(label){
+ undoStack.push({label,state:JSON.parse(JSON.stringify(snapshotState()))});
+ if(undoStack.length>20)undoStack.shift();
+}
+function undoLastAction(){
+ const u=undoStack.pop();if(!u)return;
+ applyCloudState(u.state);scheduleCloudSync();render();renderLongTasks();setSyncText('Undo restored');
+}
+
+
 // ── RENDER ───────────────────────────────────────────────────────
 function moveTaskOnDate(taskId,dateStr,delta){
   const visible=tasks.filter(t=>t.type==='recurring'||(t.type==='one-off'&&t.date===dateStr))
@@ -1309,9 +1324,7 @@ function renderLifetimeStats(){
  const prevMon=addDays(mon,-7), prevStart=fmtDate(prevMon), prevEnd=fmtDate(addDays(prevMon,6));
  const thisWeek=completionCountBetween(thisStart,thisEnd), lastWeek=completionCountBetween(prevStart,prevEnd), diff=thisWeek-lastWeek;
  document.getElementById('weekDone').textContent=thisWeek;
- const cmp=document.getElementById('weekCompare');
- cmp.textContent=diff===0?'same as last week':(diff>0?'↑ '+diff+' vs last week':'↓ '+Math.abs(diff)+' vs last week');
- cmp.className=diff>0?'up':(diff<0?'down':'');
+ const cmp=document.getElementById('weekCompare'); if(cmp){cmp.textContent='';cmp.className='';}
  maybeShowCompletionMilestone(recurringDone+dailyDone);
 }
 
@@ -1466,24 +1479,25 @@ function render() {
         card.addEventListener('dragover',e=>{
           e.preventDefault();
           const movingId=(()=>{try{return JSON.parse(e.dataTransfer.getData('text/plain')).taskId}catch{return null}})();
+          let payload=null;try{payload=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{}
           const moving=tasks.find(x=>x.id===movingId);
-          if(moving && moving.type===t.type && !card.classList.contains('dragging'))card.classList.add('drag-over');
+          if((payload?.kind==='backlog'||(moving && moving.type===t.type))&&!card.classList.contains('dragging'))card.classList.add('drag-over');
           e.dataTransfer.dropEffect='move';
         });
         card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));
         card.addEventListener('drop',e=>{
           e.preventDefault(); e.stopPropagation(); card.classList.remove('drag-over');
           let d; try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}
+          const r=card.getBoundingClientRect(),after=e.clientY > r.top+r.height/2;
+          if(d.kind==='backlog'){backlogToCalendar(d.backlogId,dateStr,t.id,after);return;}
           const moving=tasks.find(x=>x.id===d.taskId);
           if(!d || d.taskId===t.id || !moving)return;
           if(d.dateStr!==dateStr){
-            if(moving.type!=='one-off')return;
-            moveOneOffTask(d.taskId,dateStr);
-            return;
+            if(moving.type!=='one-off'||t.type!=='one-off')return;
+            captureUndo('Move task between days');moveOneOffTaskAt(d.taskId,dateStr,t.id,after);return;
           }
           if(moving.type!==t.type)return;
-          const r=card.getBoundingClientRect();
-          dragTaskOnDate(d.taskId,t.id,dateStr,e.clientY > r.top+r.height/2);
+          dragTaskOnDate(d.taskId,t.id,dateStr,after);
         });
         // Arrows reorder within the visible section, not across recurring/one-off sections.
         card.addEventListener('click', (e) => openPicker(e, t.id, dateStr));
@@ -1532,9 +1546,10 @@ function render() {
   renderLifetimeStats();
 }
 
-function deleteTask(taskId) {
+function deleteTask(taskId,skipUndo=false) {
   const task = tasks.find(t => t.id === taskId);
   if (!task) return;
+  if(!skipUndo)captureUndo('Delete task');
   taskArchive[taskId]={...task,deletedAt:new Date().toISOString(),notes:Object.fromEntries(Object.entries(notes||{}).filter(([k])=>k.startsWith(taskId+'_')))};
   saveTaskArchive(taskArchive);
 
@@ -1658,22 +1673,54 @@ function scheduleBacklogItem(id,date){
  createOneOffTask(lt.text,date);longTasks=longTasks.filter(x=>x.id!==id);normalizeBacklog();saveLong(longTasks);render();renderLongTasks();
 }
 function ensureSectionOrders(){
- backlogSections.forEach((x,i)=>{if(!Number.isFinite(x.sectionOrder))x.sectionOrder=i+1;});
- backlogSections.sort((a,b)=>a.sectionOrder-b.sectionOrder);
+ const hasSaved=backlogSections.every(x=>Number.isFinite(Number(x.sectionOrder)));
+ if(hasSaved)backlogSections.sort((a,b)=>Number(a.sectionOrder)-Number(b.sectionOrder));
+ else backlogSections.forEach((x,i)=>x.sectionOrder=i+1);
 }
-function moveBacklogSection(movingId,targetId){
- ensureSectionOrders();const a=backlogSections.findIndex(x=>x.id===movingId),b=backlogSections.findIndex(x=>x.id===targetId);if(a<0||b<0)return;
- const [x]=backlogSections.splice(a,1);backlogSections.splice(b,0,x);backlogSections.forEach((x,i)=>x.sectionOrder=i+1);saveBacklogSections(backlogSections);renderLongTasks();
+function moveBacklogSection(movingId,targetId,placeAfter=false){
+ const a=backlogSections.findIndex(x=>x.id===movingId),target=backlogSections.find(x=>x.id===targetId);if(a<0||!target)return;
+ const [moving]=backlogSections.splice(a,1);
+ let b=backlogSections.findIndex(x=>x.id===targetId);if(b<0)b=backlogSections.length;else if(placeAfter)b++;
+ backlogSections.splice(b,0,moving);backlogSections.forEach((x,i)=>x.sectionOrder=i+1);
+ saveBacklogSections(backlogSections);renderLongTasks();
 }
-function calendarTaskToBacklog(taskId,sectionId='general'){
+function calendarTaskToBacklog(taskId,sectionId='general',insertIndex=null){
+ captureUndo('Move task to backlog');
  const t=tasks.find(x=>x.id===taskId);if(!t)return;
  if(t.type==='recurring'){alert('Repeated tasks stay in the calendar. Duplicate or delete the routine if you no longer want it daily.');return;}
- longTasks.push({id:uid(),text:t.name,sectionId,backlogOrder:longTasks.filter(x=>(x.sectionId||'general')===sectionId).length+1});
- saveLong(longTasks);deleteTask(taskId);renderLongTasks();
+ const arr=longTasks.filter(x=>(x.sectionId||'general')===sectionId).sort((a,b)=>a.backlogOrder-b.backlogOrder);
+ const idx=insertIndex==null?arr.length:Math.max(0,Math.min(insertIndex,arr.length));
+ arr.splice(idx,0,{id:uid(),text:t.name,sectionId,backlogOrder:idx+1});
+ const ids=new Set(arr.map(x=>x.id));longTasks=longTasks.filter(x=>!ids.has(x.id)).concat(arr);
+ arr.forEach((x,i)=>x.backlogOrder=i+1);
+ saveLong(longTasks);deleteTask(taskId,true);renderLongTasks();
 }
-function backlogToCalendar(backlogId,date){
+function backlogToCalendar(backlogId,date,targetId=null,placeAfter=false){
+ captureUndo('Schedule backlog item');
  const lt=longTasks.find(x=>x.id===backlogId);if(!lt)return;
- createOneOffTask(lt.text,date);longTasks=longTasks.filter(x=>x.id!==backlogId);normalizeBacklog();saveLong(longTasks);render();renderLongTasks();
+ const t=createOneOffTask(lt.text,date);
+ longTasks=longTasks.filter(x=>x.id!==backlogId);normalizeBacklog();saveLong(longTasks);
+ if(targetId)dragTaskOnDate(t.id,targetId,date,placeAfter);else render();
+ renderLongTasks();
+}
+function moveOneOffTaskAt(taskId,newDate,targetId=null,placeAfter=false){
+ const t=tasks.find(x=>x.id===taskId);if(!t||t.type!=='one-off')return;
+ const oldDate=t.date,oldKey=taskId+'_'+oldDate,newKey=taskId+'_'+newDate;
+ if(statuses[oldKey]!=null){statuses[newKey]=statuses[oldKey];delete statuses[oldKey];}
+ if(notes[oldKey]!=null){notes[newKey]=notes[oldKey];delete notes[oldKey];}
+ t.date=newDate;taskCreatedLedger[taskId]=newDate;
+ // Remove stale id from source day order.
+ if(Array.isArray(dayOrders[oldDate]))dayOrders[oldDate]=dayOrders[oldDate].filter(id=>id!==taskId);
+ saveTasks(tasks);saveStatuses(statuses);saveNotes(notes);saveTaskCreatedLedger(taskCreatedLedger);
+ if(targetId){
+   const visible=tasks.filter(x=>x.type==='one-off'&&x.date===newDate).sort((a,b)=>{
+     const seq=dayOrders[newDate]||[];const ai=seq.indexOf(a.id),bi=seq.indexOf(b.id);
+     if(ai!==-1||bi!==-1){if(ai===-1)return 1;if(bi===-1)return -1;return ai-bi;}return a.order-b.order;
+   });
+   const rest=visible.filter(x=>x.id!==taskId);let j=rest.findIndex(x=>x.id===targetId);if(j<0)j=rest.length;else if(placeAfter)j++;
+   rest.splice(j,0,t);dayOrders[newDate]=rest.map(x=>x.id);saveDayOrders(dayOrders);
+ } else {saveDayOrders(dayOrders);}
+ closePicker();render();
 }
 let datePickAction=null;
 function askPlannerDate(title,defaultDate,action){
@@ -1690,28 +1737,27 @@ function renderLongTasks(){
  const bar=document.createElement('div');bar.className='backlog-toolbar';bar.innerHTML='<button class="backlog-mini-btn">+ Section</button><span class="backlog-toolbar-hint">Drag sections, tasks, or tasks to/from calendar</span>';
  bar.querySelector('button').onclick=()=>{const n=prompt('Section name');if(n&&n.trim()){backlogSections.push({id:uid(),name:n.trim(),sectionOrder:backlogSections.length+1});saveBacklogSections(backlogSections);renderLongTasks()}};list.appendChild(bar);
  backlogSections.forEach(sec=>{
-   const w=document.createElement('div');w.className='backlog-section';w.dataset.sectionId=sec.id;w.draggable=true;
+   const w=document.createElement('div');w.className='backlog-section';w.dataset.sectionId=sec.id;
    w.innerHTML=`<div class="backlog-section-head"><span class="section-grip">⋮⋮</span><div class="backlog-section-title">${escHtml(sec.name)}</div><button class="backlog-mini-btn ren">Rename</button>${sec.id==='general'?'':'<button class="backlog-mini-btn del">×</button>'}</div><div class="backlog-section-items"></div>`;
    w.querySelector('.ren').onclick=e=>{e.stopPropagation();const n=prompt('Rename section',sec.name);if(n&&n.trim()){sec.name=n.trim();saveBacklogSections(backlogSections);renderLongTasks()}};
    const del=w.querySelector('.del');if(del)del.onclick=e=>{e.stopPropagation();longTasks.forEach(t=>{if(t.sectionId===sec.id)t.sectionId='general'});backlogSections=backlogSections.filter(x=>x.id!==sec.id);normalizeBacklog();saveLong(longTasks);saveBacklogSections(backlogSections);renderLongTasks()};
-   w.addEventListener('dragstart',e=>{if(e.target.closest('.backlog-item')||e.target.closest('button'))return;w.classList.add('dragging-section');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',JSON.stringify({kind:'backlog-section',sectionId:sec.id}))});
-   w.addEventListener('dragend',()=>w.classList.remove('dragging-section'));
+   const head=w.querySelector('.backlog-section-head');head.draggable=true;
+   head.addEventListener('dragstart',e=>{if(e.target.closest('button')){e.preventDefault();return;}w.classList.add('dragging-section');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',JSON.stringify({kind:'backlog-section',sectionId:sec.id}))});
+   head.addEventListener('dragend',()=>w.classList.remove('dragging-section'));
    w.addEventListener('dragover',e=>{let d;try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();w.classList.add('section-drop')}});
    w.addEventListener('dragleave',()=>w.classList.remove('section-drop'));
-   w.addEventListener('drop',e=>{w.classList.remove('section-drop');let d;try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();e.stopPropagation();moveBacklogSection(d.sectionId,sec.id)}});
+   w.addEventListener('drop',e=>{w.classList.remove('section-drop');let d;try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();e.stopPropagation();moveBacklogSection(d.sectionId,sec.id,e.clientY>w.getBoundingClientRect().top+w.getBoundingClientRect().height/2)}});
    const box=w.querySelector('.backlog-section-items');
    longTasks.filter(t=>t.sectionId===sec.id).sort((a,b)=>a.backlogOrder-b.backlogOrder).forEach(lt=>{
      const item=document.createElement('div');item.className='long-task-item backlog-item';item.draggable=true;item.dataset.id=lt.id;
-     item.innerHTML=`<span class="backlog-drag">≡</span><span class="long-task-text">${escHtml(lt.text)}</span><span class="backlog-schedule"><button class="btn tmr" title="Schedule tomorrow">Tomorrow</button><button class="btn dt" title="Choose date">Date</button></span><button class="long-task-del" aria-label="Delete">×</button>`;
-     item.querySelector('.tmr').onclick=e=>{e.stopPropagation();scheduleBacklogItem(lt.id,fmtDate(addDays(new Date(),1)))};
-     item.querySelector('.dt').onclick=e=>{e.stopPropagation();askPlannerDate('Choose date',fmtDate(addDays(new Date(),1)),d=>scheduleBacklogItem(lt.id,d))};
+     item.innerHTML=`<span class="backlog-drag">≡</span><span class="long-task-text">${escHtml(lt.text)}</span><span class="long-task-del" role="button" aria-label="Delete" title="Delete">×</span>`;
      item.querySelector('.long-task-del').onclick=e=>{e.stopPropagation();deleteLongTask(lt.id)};
      item.addEventListener('dragstart',e=>{e.stopPropagation();item.classList.add('dragging');e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',JSON.stringify({kind:'backlog',backlogId:lt.id,sectionId:sec.id}))});
      item.addEventListener('dragend',()=>item.classList.remove('dragging'));box.appendChild(item);
    });
    box.addEventListener('dragover',e=>{let d;try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}if(d.kind==='backlog'||d.kind==='calendar'){e.preventDefault();box.classList.add('backlog-box-drop');if(d.kind==='backlog'){const x=document.querySelector('.backlog-item.dragging');if(x){const y=dragAfter(box,e.clientY);y?box.insertBefore(x,y):box.appendChild(x)}}}});
    box.addEventListener('dragleave',()=>box.classList.remove('backlog-box-drop'));
-   box.addEventListener('drop',e=>{box.classList.remove('backlog-box-drop');let d;try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}if(d.kind==='calendar'){e.preventDefault();e.stopPropagation();calendarTaskToBacklog(d.taskId,sec.id);return}if(d.kind==='backlog'){e.preventDefault();e.stopPropagation();const t=longTasks.find(x=>x.id===d.backlogId);if(!t)return;t.sectionId=sec.id;[...box.querySelectorAll('.backlog-item')].forEach((el,i)=>{const q=longTasks.find(x=>x.id===el.dataset.id);if(q){q.sectionId=sec.id;q.backlogOrder=i+1}});normalizeBacklog();saveLong(longTasks);renderLongTasks()}});
+   box.addEventListener('drop',e=>{box.classList.remove('backlog-box-drop');let d;try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}if(d.kind==='calendar'){e.preventDefault();e.stopPropagation();const afterEl=dragAfter(box,e.clientY);const children=[...box.querySelectorAll('.backlog-item')];const idx=afterEl?children.indexOf(afterEl):children.length;calendarTaskToBacklog(d.taskId,sec.id,idx);return}if(d.kind==='backlog'){e.preventDefault();e.stopPropagation();const t=longTasks.find(x=>x.id===d.backlogId);if(!t)return;t.sectionId=sec.id;[...box.querySelectorAll('.backlog-item')].forEach((el,i)=>{const q=longTasks.find(x=>x.id===el.dataset.id);if(q){q.sectionId=sec.id;q.backlogOrder=i+1}});normalizeBacklog();saveLong(longTasks);renderLongTasks()}});
    list.appendChild(w);
  });
 }
@@ -1962,6 +2008,7 @@ document.getElementById('toggleSidebar').addEventListener('click', () => {
 });
 
 function deleteLongTask(id) {
+  captureUndo('Delete backlog item');
   longTasks = longTasks.filter(lt => lt.id !== id);
   saveLong(longTasks);
   renderLongTasks();
@@ -2031,11 +2078,14 @@ function openWeeklyReview(){
  document.getElementById('reviewModal').style.display='flex';
 }
 
-document.getElementById('searchBtn').onclick=openSearch;document.getElementById('reviewBtn').onclick=openWeeklyReview;
+document.getElementById('searchBtn').onclick=openSearch;
+document.getElementById('reviewBtn').onclick=()=>{const m=document.getElementById('reviewModal');if(m.style.display==='flex'){m.style.display='none';}else openWeeklyReview();};
 document.getElementById('plannerSearch').addEventListener('input',e=>renderSearchResults(e.target.value));
 document.getElementById('closeSearch').onclick=()=>document.getElementById('searchModal').style.display='none';
 document.getElementById('closeReview').onclick=()=>document.getElementById('reviewModal').style.display='none';
+document.getElementById('reviewModal').addEventListener('click',e=>{if(e.target===document.getElementById('reviewModal'))document.getElementById('reviewModal').style.display='none';});
 document.addEventListener('keydown',e=>{
+ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'&&!e.shiftKey){e.preventDefault();undoLastAction();return;}
  if(e.key==='Escape'){document.getElementById('searchModal').style.display='none';document.getElementById('reviewModal').style.display='none';document.getElementById('infoModal').style.display='none';closePicker();return;}
  const tag=(e.target.tagName||'').toLowerCase();if(['input','textarea','select'].includes(tag)||e.metaKey||e.ctrlKey||e.altKey)return;
  if(e.key==='/' ){e.preventDefault();openSearch();}
