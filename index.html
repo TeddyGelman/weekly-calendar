@@ -722,6 +722,10 @@
 #reviewModal .modal-actions{margin-top:12px}
 @media(max-width:700px){#reviewModal .planner-wide-modal{padding:13px}#reviewTitle{font-size:18px}.review-total-wrap{grid-template-columns:1fr}.review-main-total{border-right:0;border-bottom:1px solid var(--border)}.review-best{grid-template-columns:72px 1fr}.review-trophy svg{width:42px;height:42px}.review-best-copy strong{font-size:17px}.review-equation{font-size:8px}}
 
+/* v47 precise task drag placement */
+.task-card.drag-before{box-shadow:inset 0 2px 0 var(--blue)!important}
+.task-card.drag-after{box-shadow:inset 0 -2px 0 var(--blue)!important}
+
 /* v45 scrollable week-summary history */
 .review-history{margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
 .review-history-head{display:flex;align-items:center;justify-content:space-between;margin:0 2px 8px}
@@ -767,7 +771,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v46-safe-week-summary-history</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v47-precise-task-drag</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -1451,19 +1455,48 @@ function render() {
     });
 
     function attachDropZone(list,subset){
-      list.addEventListener('dragover',e=>e.preventDefault());
-      list.addEventListener('drop',e=>{
-        if(e.target.closest('.task-card'))return;
+      list.addEventListener('dragover',e=>{
         e.preventDefault();
-        let d=activeDragPayload; if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}}
-        if(!d || d.dateStr!==dateStr)return;
-        const moving=tasks.find(t=>t.id===d.taskId);
-        if(!moving)return;
-        // Keep recurring tasks in the recurring section and one-offs in Today's Tasks.
-        if((list===recurringList && moving.type!=='recurring') || (list===todayList && moving.type!=='one-off'))return;
-        const visible=subset.filter(t=>t.id!==d.taskId);
-        const last=visible[visible.length-1];
-        if(last)dragTaskOnDate(d.taskId,last.id,dateStr,true);
+        e.dataTransfer.dropEffect='move';
+      });
+      list.addEventListener('drop',e=>{
+        // Card drops are handled by the card itself. This handler is specifically for
+        // the gaps above/below/between cards, which previously always meant "bottom".
+        if(e.target.closest('.task-card'))return;
+        e.preventDefault();e.stopPropagation();
+        let d=activeDragPayload;
+        if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}}
+        if(!d)return;
+        const cards=Array.from(list.querySelectorAll('.task-card:not(.dragging)'));
+        // Find the first card whose midpoint is below the pointer. That is the exact
+        // insertion point the user is visually aiming at.
+        const nextCard=cards.find(c=>e.clientY < c.getBoundingClientRect().top+c.getBoundingClientRect().height/2);
+        const prevCard=nextCard ? cards[cards.indexOf(nextCard)-1] : cards[cards.length-1];
+
+        if(d.kind==='backlog'){
+          if(list!==todayList)return;
+          if(nextCard)backlogToCalendar(d.backlogId,dateStr,nextCard.dataset.taskId,false);
+          else if(prevCard)backlogToCalendar(d.backlogId,dateStr,prevCard.dataset.taskId,true);
+          else backlogToCalendar(d.backlogId,dateStr);
+          return;
+        }
+
+        const moving=tasks.find(t=>t.id===d.taskId);if(!moving)return;
+        if((list===recurringList&&moving.type!=='recurring')||(list===todayList&&moving.type!=='one-off'))return;
+
+        // Moving a one-off from another day: preserve the exact gap position too.
+        if(d.dateStr!==dateStr){
+          if(moving.type!=='one-off'||list!==todayList)return;
+          captureUndo('Move task between days');
+          if(nextCard)moveOneOffTaskAt(d.taskId,dateStr,nextCard.dataset.taskId,false);
+          else if(prevCard)moveOneOffTaskAt(d.taskId,dateStr,prevCard.dataset.taskId,true);
+          else moveOneOffTaskAt(d.taskId,dateStr);
+          return;
+        }
+
+        if(nextCard)dragTaskOnDate(d.taskId,nextCard.dataset.taskId,dateStr,false);
+        else if(prevCard)dragTaskOnDate(d.taskId,prevCard.dataset.taskId,dateStr,true);
+        // A one-item list is already in the only possible position.
       });
     }
     attachDropZone(recurringList,recurringTasks);
@@ -1494,20 +1527,26 @@ function render() {
         });
         card.addEventListener('dragend',()=>{
           card.classList.remove('dragging');activeDragPayload=null;
-          document.querySelectorAll('.task-card.drag-over').forEach(x=>x.classList.remove('drag-over'));
+          document.querySelectorAll('.task-card.drag-over,.task-card.drag-before,.task-card.drag-after').forEach(x=>x.classList.remove('drag-over','drag-before','drag-after'));
         });
         card.addEventListener('dragover',e=>{
           e.preventDefault();
           const movingId=activeDragPayload?.taskId||(()=>{try{return JSON.parse(e.dataTransfer.getData('text/plain')).taskId}catch{return null}})();
           let payload=activeDragPayload; if(!payload){try{payload=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{}}
           const moving=tasks.find(x=>x.id===movingId);
-          if((payload?.kind==='backlog'||(moving && moving.type===t.type))&&!card.classList.contains('dragging'))card.classList.add('drag-over');
+          if((payload?.kind==='backlog'||(moving && moving.type===t.type))&&!card.classList.contains('dragging')){
+            const r=card.getBoundingClientRect(),after=e.clientY > r.top+r.height/2;
+            card.classList.remove('drag-before','drag-after');
+            card.classList.add(after?'drag-after':'drag-before');
+          }
           e.dataTransfer.dropEffect='move';
         });
-        card.addEventListener('dragleave',()=>card.classList.remove('drag-over'));
+        card.addEventListener('dragleave',()=>card.classList.remove('drag-over','drag-before','drag-after'));
         card.addEventListener('drop',e=>{
-          e.preventDefault(); e.stopPropagation(); card.classList.remove('drag-over');
-          let d; try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}
+          e.preventDefault(); e.stopPropagation(); card.classList.remove('drag-over','drag-before','drag-after');
+          let d=activeDragPayload;
+          if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}}
+          if(!d)return;
           const r=card.getBoundingClientRect(),after=e.clientY > r.top+r.height/2;
           if(d.kind==='backlog'){backlogToCalendar(d.backlogId,dateStr,t.id,after);return;}
           const moving=tasks.find(x=>x.id===d.taskId);
