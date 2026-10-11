@@ -748,7 +748,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v43-reliable-drag-compact-popup</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v44-carry-tomorrow</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -976,7 +976,7 @@
     <div class="picker-actions">
       <button class="btn picker-action" id="pickerPriority" type="button">☆ Priority</button>
       <button class="btn picker-action" id="pickerDuplicate" type="button">⧉ Duplicate</button>
-      <button class="btn picker-action" id="pickerTomorrow" type="button">→ Tomorrow</button>
+      <button class="btn picker-action" id="pickerTomorrow" type="button" title="Keep this task here and also carry it to tomorrow">→ Tomorrow</button>
       <button class="btn picker-action" id="pickerNextWeek" type="button">→ Next week</button>
       <button class="btn picker-action" id="pickerPickDate" type="button">📅 Pick date</button>
     </div>
@@ -1845,7 +1845,16 @@ document.getElementById('pickerDuplicate').addEventListener('click',()=>{
  }
  closePicker();render();
 });
-document.getElementById('pickerTomorrow').addEventListener('click',()=>{if(pickerTarget)moveOneOffTask(pickerTarget.taskId,fmtDate(addDays(new Date(pickerTarget.dateStr+'T12:00:00'),1)))});
+document.getElementById('pickerTomorrow').addEventListener('click',()=>{
+ if(!pickerTarget)return;
+ const source=tasks.find(x=>x.id===pickerTarget.taskId);if(!source||source.type!=='one-off')return;
+ captureUndo('Carry task to tomorrow');
+ const tomorrow=fmtDate(addDays(new Date(pickerTarget.dateStr+'T12:00:00'),1));
+ createOneOffTask(source.name,tomorrow,{priority:!!source.priority,note:notes[noteKeyForTask(source.id,pickerTarget.dateStr)]||''});
+ // Deliberately keep the original task, status and date untouched so an unfinished
+ // task remains visible on its original day while a fresh copy appears tomorrow.
+ closePicker();render();
+});
 document.getElementById('pickerNextWeek').addEventListener('click',()=>{if(pickerTarget)moveOneOffTask(pickerTarget.taskId,fmtDate(addDays(new Date(pickerTarget.dateStr+'T12:00:00'),7)))});
 document.getElementById('pickerPickDate').addEventListener('click',()=>{if(!pickerTarget)return;const id=pickerTarget.taskId,def=pickerTarget.dateStr;closePicker();askPlannerDate('Move task to…',def,d=>moveOneOffTask(id,d));});
 document.getElementById('pickerDelete').addEventListener('click', () => {
