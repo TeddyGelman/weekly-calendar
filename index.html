@@ -767,7 +767,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v45-week-summary-history</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v46-safe-week-summary-history</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -2093,18 +2093,16 @@ function weeklyReviewStats(mon){
    bestLabel:bestDate?bestDate.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'}):'No completed tasks'};
 }
 function historicalWeekSummaries(currentMon){
- const dates=lifetimeOccurrences.map(x=>x.date).filter(Boolean).sort();
- if(!dates.length)return [];
- let first=weekStart(new Date(dates[0]+'T12:00:00'));
- const out=[],cursor=addDays(currentMon,-7);
- while(cursor>=first){
-   const st=weeklyReviewStats(cursor);
-   // Include every historical week from the beginning of recorded planner history,
-   // even a zero-completion week, so the timeline is honest and continuous.
-   out.push(st);
-   cursor=addDays(cursor,-7);
- }
- return out;
+ // Build history only from real recorded dates. This avoids a date-by-date/week-by-week
+ // loop, so a malformed or very old ledger date can never freeze the Week Summary button.
+ const currentKey=fmtDate(currentMon),weekKeys=new Set();
+ lifetimeOccurrences.forEach(x=>{
+   if(!x||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(x.date||''))return;
+   const d=new Date(x.date+'T12:00:00');if(Number.isNaN(d.getTime()))return;
+   const mon=weekStart(d),key=fmtDate(mon);
+   if(key<currentKey)weekKeys.add(key);
+ });
+ return Array.from(weekKeys).sort().reverse().slice(0,260).map(key=>weeklyReviewStats(new Date(key+'T12:00:00')));
 }
 function historyWeekMarkup(st){
  const bestShort=st.best?new Date(st.best[0]+'T12:00:00').toLocaleDateString(undefined,{weekday:'long'}):'—';
@@ -2125,7 +2123,8 @@ function historyWeekMarkup(st){
 function openWeeklyReview(){
  lifetimeOccurrences=buildLifetimeOccurrences();
  const mon=weekStart(calendarView==='day'?selectedDay:currentMonday),st=weeklyReviewStats(mon);
- const history=historicalWeekSummaries(mon);
+ let history=[];
+ try{history=historicalWeekSummaries(mon);}catch(err){console.error('Week history error',err);history=[];}
  document.getElementById('reviewTitle').innerHTML='Week Summary <span class="review-range">'+fmtWeekLabel(mon)+'</span>';
  document.getElementById('reviewBody').innerHTML=`
    <div class="review-total-wrap">
