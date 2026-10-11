@@ -701,6 +701,26 @@
 .milestone-toast{position:fixed;left:50%;top:18px;transform:translate(-50%,-18px);opacity:0;z-index:3000;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;box-shadow:0 10px 30px rgba(0,0,0,.4);display:flex;flex-direction:column;align-items:center;gap:2px;transition:.25s;pointer-events:none}.milestone-toast.show{opacity:1;transform:translate(-50%,0)}.milestone-toast strong{font-size:13px}.milestone-toast span{font-size:9px;color:var(--text2)}
 .picker-actions{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:7px 10px}.picker-action{font-size:10px;padding:6px 7px}.task-priority{color:#f4c95d;font-size:11px;margin-right:4px}.priority-card{box-shadow:inset 2px 0 0 #f4c95d}.backlog-schedule{display:flex;gap:4px;margin-left:auto}.backlog-schedule button{font-size:9px;padding:2px 5px}.planner-wide-modal{width:min(620px,calc(100vw - 24px));max-height:80vh;overflow:auto}.planner-results{margin-top:10px;max-height:52vh;overflow:auto}.search-result{padding:8px 4px;border-top:1px solid var(--border);cursor:pointer}.search-result:hover{background:var(--surface2)}.search-result-title{font-size:12px;font-weight:700}.search-result-meta{font-size:9px;color:var(--text2);margin-top:2px}.search-result-note{font-size:10px;color:var(--text2);margin-top:3px}.review-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0 14px}.review-stat{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center}.review-stat strong{display:block;font-size:22px}.review-stat span{font-size:9px;color:var(--text2)}.review-list{font-size:11px;line-height:1.6}.shortcut-hint{font-size:9px;color:var(--text2)}@media(max-width:700px){#searchBtn,#reviewBtn{padding:6px;font-size:0}#searchBtn:after{content:"⌕";font-size:15px}#reviewBtn:after{content:"Σ";font-size:13px}.review-grid{grid-template-columns:1fr 1fr}.picker-actions{grid-template-columns:1fr 1fr}}
 .info-modal{width:min(780px,calc(100vw - 24px));max-height:88vh;overflow:hidden;padding:0;display:flex;flex-direction:column}.info-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:16px 18px 10px;border-bottom:1px solid var(--border)}.info-head h2{margin:0}.info-sub{font-size:10px;color:var(--text2);margin-top:3px}.info-nav{display:flex;gap:5px;padding:8px 14px;border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0}.info-nav .btn{font-size:9px;padding:5px 8px;white-space:nowrap}.info-content{padding:2px 18px 18px;overflow-y:auto;-webkit-overflow-scrolling:touch}.info-section{padding:13px 0;border-bottom:1px solid var(--border);scroll-margin-top:8px}.info-section:last-child{border-bottom:0}.info-section h3{font-size:13px;margin:0 0 7px}.info-section p{font-size:11px;line-height:1.55;margin:6px 0;color:var(--text2)}.info-section p b{color:var(--text)}.info-status-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.info-status-grid>div{display:grid;grid-template-columns:auto 1fr;column-gap:7px;row-gap:2px;padding:8px;border:1px solid var(--border);border-radius:7px;background:var(--surface2)}.info-status-grid span{grid-column:2;font-size:9px;line-height:1.4;color:var(--text2)}.info-dot{width:8px;height:8px;border-radius:50%;margin-top:4px}.info-dot.red{background:var(--red)}.info-dot.orange{background:var(--orange)}.info-dot.blue{background:var(--blue)}.info-dot.green{background:var(--green)}.shortcut-table{display:grid;grid-template-columns:1fr 1fr;gap:6px 16px}.shortcut-table>div{display:flex;align-items:center;gap:8px;font-size:10px}.shortcut-table kbd{min-width:30px;text-align:center;padding:4px 6px;border:1px solid var(--border);border-bottom-width:2px;border-radius:5px;background:var(--surface2);font:600 10px inherit;color:var(--text)}.info-muted{font-size:9px!important}.info-modal .icon-only{font-size:17px}@media(max-width:700px){.info-modal{max-height:92vh}.info-content{padding:0 12px 14px}.info-head{padding:13px 12px 9px}.info-status-grid,.shortcut-table{grid-template-columns:1fr}.info-nav{padding:7px 10px}}
+
+/* v38 compact UI */
+.topbar{gap:8px}.utility-wrap{margin-left:0}.status-picker{width:min(360px,calc(100vw - 20px));max-height:min(620px,calc(100vh - 20px));padding:0;border-radius:12px;box-shadow:0 18px 55px rgba(0,0,0,.45)}
+.status-picker-title{padding:12px 14px 6px;font-size:12px}.status-picker .notes-wrap{margin:6px 10px;padding:0;border:0;background:transparent}.status-picker .notes-label{font-size:9px;margin-bottom:4px}.status-picker .notes-hint{font-size:8px;margin-top:3px}.status-picker .notes{font-size:11px;padding:7px 9px;min-height:34px}.status-picker textarea.notes{min-height:66px}.status-picker .status-option{display:inline-flex;width:calc(25% - 8px);box-sizing:border-box;margin:5px 2px;padding:8px 5px;justify-content:center;gap:5px;border:1px solid var(--border);border-radius:7px;font-size:9px}.status-picker .status-option .dot{width:8px;height:8px}.status-picker .picker-sep{margin:7px 10px}.picker-actions{padding:5px 10px 8px;grid-template-columns:1fr 1fr}.picker-del{margin:0 10px 10px;padding:7px 3px;font-size:10px}.task-reorder,.task-move{display:none!important}.task-card{cursor:grab}.task-card:active{cursor:grabbing}
+.long-task-item{display:grid!important;grid-template-columns:18px minmax(0,1fr) auto 18px;align-items:center!important;gap:7px!important;padding:7px 8px!important}.long-task-text{min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:normal!important;font-size:11px}.backlog-schedule{display:flex;gap:3px;margin-left:0!important}.backlog-schedule button{font-size:8px!important;padding:3px 6px!important;white-space:nowrap}.long-task-del{margin-left:0}.backlog-drag{cursor:grab}.backlog-section{overflow:hidden}.backlog-section-header{cursor:grab}.backlog-section.dragging{opacity:.45}.backlog-section.section-drop{outline:1px solid var(--blue)}
+.calendar-day-drop{outline:2px dashed var(--blue)!important;outline-offset:-3px}.backlog-drop-active{outline:2px dashed var(--blue)!important;outline-offset:-3px}
+.compact-date-modal{width:min(320px,calc(100vw - 24px))}.compact-date-modal input{width:100%;box-sizing:border-box;padding:9px;border:1px solid var(--border);border-radius:7px;background:var(--bg);color:var(--text)}
+@media(max-width:700px){.backlog-schedule{grid-column:2/4;justify-content:flex-start}.long-task-item{grid-template-columns:18px minmax(0,1fr) 18px}.long-task-del{grid-column:3}.backlog-schedule button{font-size:8px!important}.status-picker{width:calc(100vw - 16px)}}
+
+/* v39 Week Summary */
+#reviewModal .planner-wide-modal{width:min(700px,calc(100vw - 24px));padding:20px;border-radius:14px;background:var(--surface);box-shadow:0 24px 70px rgba(0,0,0,.55)}
+#reviewTitle{margin:0 0 16px;font-size:22px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.review-title-icon{font-size:20px;color:#60a5fa}.review-range{font-size:11px;font-weight:500;color:var(--text2);margin-left:2px}
+.review-total-wrap{display:grid;grid-template-columns:1.05fr 1.7fr;gap:10px;padding:10px;border:1px solid rgba(91,209,146,.35);border-radius:11px;background:linear-gradient(90deg,rgba(52,211,153,.08),rgba(52,211,153,.015))}
+.review-main-total{display:flex;align-items:center;justify-content:center;gap:12px;border-right:1px solid var(--border);padding:8px 12px}.review-check{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#6ee7a8;color:#10251a;font-size:25px;font-weight:900}.review-main-total div,.review-break-card div{display:flex;flex-direction:column}.review-main-total strong{font-size:31px;line-height:1}.review-main-total span:not(.review-check){font-size:11px;color:var(--text2);margin-top:5px}
+.review-breakdown{display:grid;grid-template-columns:1fr 1fr;gap:8px}.review-break-card{display:flex;align-items:center;justify-content:center;gap:10px;padding:9px;border:1px solid var(--border);border-radius:9px;background:var(--surface2)}.review-break-card.repeated{border-color:rgba(96,165,250,.4);background:rgba(59,130,246,.07)}.review-break-card.daily{border-color:rgba(192,132,252,.4);background:rgba(168,85,247,.07)}.review-break-icon{font-size:25px}.review-break-card.repeated .review-break-icon{color:#60a5fa}.review-break-card.daily .review-break-icon{color:#c084fc}.review-break-card strong{font-size:23px;line-height:1}.review-break-card span:last-child{font-size:10px;color:var(--text2);margin-top:3px}.review-equation{grid-column:1/-1;text-align:center;font-size:9px;color:var(--text2);padding-top:1px}
+.review-priority{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 14px;border:1px solid rgba(251,191,36,.35);border-radius:10px;background:rgba(245,158,11,.045)}.review-priority .review-star{font-size:22px;color:#fbbf24}.review-priority strong{font-size:22px}.review-priority span:last-child{font-size:10px;color:var(--text2)}
+.review-best{display:grid;grid-template-columns:100px 1fr;align-items:center;margin-top:10px;min-height:116px;border:1px solid #fbbf24;border-radius:11px;background:radial-gradient(circle at 15% 50%,rgba(251,191,36,.17),rgba(251,191,36,.025) 45%,transparent 75%);box-shadow:inset 0 0 24px rgba(251,191,36,.04)}.review-trophy{text-align:center;font-size:52px;filter:drop-shadow(0 0 10px rgba(251,191,36,.35))}.review-best-copy{display:flex;flex-direction:column;align-items:center;text-align:center;padding:12px;border-left:1px solid rgba(251,191,36,.25)}.review-best-copy span{font-size:9px;letter-spacing:1.4px;color:var(--text2);font-weight:800}.review-best-copy strong{font-size:24px;margin:4px 0 2px}.review-best-copy em{font-size:12px;color:#fbbf24;font-style:normal;font-weight:700}
+#reviewModal .modal-actions{margin-top:12px}
+@media(max-width:700px){#reviewModal .planner-wide-modal{padding:13px}#reviewTitle{font-size:18px}.review-total-wrap{grid-template-columns:1fr}.review-main-total{border-right:0;border-bottom:1px solid var(--border)}.review-best{grid-template-columns:72px 1fr}.review-trophy{font-size:38px}.review-best-copy strong{font-size:17px}.review-equation{font-size:8px}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -711,7 +731,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v37-comprehensive-info-guide</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v39-week-summary-polish</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -746,7 +766,7 @@
   <button class="btn primary" id="addTaskBtn">+ Add Task</button>
   <button class="btn" id="toggleSidebar" title="Long-term tasks">📋 Backlog</button>
   <div class="utility-wrap">
-    <button class="btn" id="searchBtn" title="Search tasks and notes">⌕ Search</button><button class="btn" id="reviewBtn" title="Weekly summary">Week Summary</button><button class="btn icon-only" id="infoBtn" title="Planner guide & shortcuts" aria-label="Planner information">ⓘ</button><button class="btn icon-only" id="utilityBtn" title="Calendar options" aria-label="Calendar options">⋯</button>
+    <button class="btn icon-only" id="searchBtn" title="Search tasks and notes" aria-label="Search">⌕</button><button class="btn icon-only" id="reviewBtn" title="Weekly summary" aria-label="Week Summary">Σ</button><button class="btn icon-only" id="infoBtn" title="Planner guide & shortcuts" aria-label="Planner information">ⓘ</button><button class="btn icon-only" id="utilityBtn" title="Calendar options" aria-label="Calendar options">⋯</button>
     <div class="utility-menu" id="utilityMenu" style="display:none">
       <button id="refreshCloud">↻ Refresh from cloud</button>
       <button id="exportBackup">↓ Download backup</button>
@@ -820,6 +840,12 @@
   </div>
 </div>
 
+<!-- DATE PICKER -->
+<div class="modal-overlay" id="datePickModal" style="display:none"><div class="modal compact-date-modal">
+  <h2 id="datePickTitle">Choose date</h2>
+  <input type="date" id="datePickInput">
+  <div class="modal-actions"><button class="btn" id="datePickCancel">Cancel</button><button class="btn primary" id="datePickSave">Schedule</button></div>
+</div></div>
 <!-- PLANNER INFORMATION -->
 <div class="modal-overlay" id="infoModal" style="display:none">
   <div class="modal info-modal">
@@ -865,7 +891,7 @@
         <p>Each repeated task/day combination is its own occurrence. Completing the same routine on five different days therefore records five completions.</p>
       </section>
 
-      <section class="info-section" id="infoBacklog"><h3>Backlog</h3>
+      <section class="info-section" id="infoBacklog"><h3>Backlog</h3><p><b>Drag between calendar and backlog:</b> one-off calendar tasks can be dragged into the Backlog, and backlog items can be dragged onto a day to schedule them. You can also drag one-off tasks directly from one day to another. Repeated routines remain daily and therefore are not moved between dates.</p><p><b>Backlog ordering:</b> drag backlog items to reorder them or move them between categories. Drag category headers to rearrange the categories themselves.</p>
         <p>The Backlog stores things you want to remember without assigning them to a day yet. Organize items into named sections, rename sections, delete sections, and drag items to reorder or move them between sections.</p>
         <p><b>Schedule</b> a backlog item directly to Tomorrow, This week, or a chosen Date. Scheduling turns it into a dated one-off calendar task and removes it from the backlog.</p>
       </section>
@@ -923,14 +949,6 @@
 <div class="status-picker" id="statusPicker" style="display:none">
   <div class="status-picker-title" id="pickerTitle">Set Status</div>
   <div class="notes-wrap"><div class="notes-label">Task title</div><input class="notes" id="taskTitleEdit" style="min-height:0;resize:none"><div class="notes-hint">Saved automatically.</div></div>
-  <div class="notes-wrap">
-    <div class="notes-label">Position on this day</div>
-    <div style="display:flex;gap:6px;align-items:center">
-      <input class="notes" id="taskPositionEdit" type="number" min="1" step="1" style="min-height:0;resize:none;width:72px" aria-label="Task position">
-      <button class="btn" id="taskPositionApply" type="button" style="padding:5px 9px;font-size:11px">Move</button>
-    </div>
-    <div class="notes-hint">Type a number, e.g. 3, to move this task to #3 on this date.</div>
-  </div>
   <div class="status-option" data-status="not-started">
     <div class="dot" style="background:var(--red)"></div> Not Started
   </div>
@@ -1422,11 +1440,7 @@ function render() {
         card.classList.add('calendar-draggable');
         card.draggable = true;
         card.innerHTML = `
-          <div class="task-reorder">
-            <button class="task-move move-up" type="button" title="Move up" aria-label="Move task up">▲</button>
-            <button class="task-move move-down" type="button" title="Move down" aria-label="Move task down">▼</button>
-          </div>
-          <div class="task-dot"></div>
+<div class="task-dot"></div>
           <div class="task-info">
             <div class="task-name">${t.priority?'<span class="task-priority">★</span>':''}${escHtml(t.name)}</div>
             <div class="task-order-badge">#${displayIndex + 1}</div>
@@ -1437,7 +1451,7 @@ function render() {
           if(e.target.closest('button')){e.preventDefault();return;}
           card.classList.add('dragging');
           e.dataTransfer.effectAllowed='move';
-          e.dataTransfer.setData('text/plain',JSON.stringify({taskId:t.id,dateStr}));
+          e.dataTransfer.setData('text/plain',JSON.stringify({kind:'calendar',taskId:t.id,dateStr}));
         });
         card.addEventListener('dragend',()=>{
           card.classList.remove('dragging');
@@ -1455,23 +1469,17 @@ function render() {
           e.preventDefault(); e.stopPropagation(); card.classList.remove('drag-over');
           let d; try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}
           const moving=tasks.find(x=>x.id===d.taskId);
-          if(!d || d.dateStr!==dateStr || d.taskId===t.id || !moving || moving.type!==t.type)return;
+          if(!d || d.taskId===t.id || !moving)return;
+          if(d.dateStr!==dateStr){
+            if(moving.type!=='one-off')return;
+            moveOneOffTask(d.taskId,dateStr);
+            return;
+          }
+          if(moving.type!==t.type)return;
           const r=card.getBoundingClientRect();
           dragTaskOnDate(d.taskId,t.id,dateStr,e.clientY > r.top+r.height/2);
         });
         // Arrows reorder within the visible section, not across recurring/one-off sections.
-        card.querySelector('.move-up').addEventListener('click',e=>{
-          e.stopPropagation();
-          const subset=(t.type==='recurring'?recurringTasks:oneOffTasks);
-          const idx=subset.findIndex(x=>x.id===t.id);
-          if(idx>0)dragTaskOnDate(t.id,subset[idx-1].id,dateStr,false);
-        });
-        card.querySelector('.move-down').addEventListener('click',e=>{
-          e.stopPropagation();
-          const subset=(t.type==='recurring'?recurringTasks:oneOffTasks);
-          const idx=subset.findIndex(x=>x.id===t.id);
-          if(idx>=0 && idx<subset.length-1)dragTaskOnDate(t.id,subset[idx+1].id,dateStr,true);
-        });
         card.addEventListener('click', (e) => openPicker(e, t.id, dateStr));
         card.querySelector('.task-delete').addEventListener('click', (e) => { e.stopPropagation(); deleteTask(t.id); });
         list.appendChild(card);
@@ -1488,6 +1496,18 @@ function render() {
     }else{
       oneOffTasks.forEach((t,idx)=>renderTaskCard(t,idx,todayList));
     }
+    todayList.addEventListener('dragover',e=>{
+      let d;try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}
+      if(d.kind==='backlog'){e.preventDefault();todayList.classList.add('calendar-day-drop');return;}
+      const moving=tasks.find(x=>x.id===d.taskId);
+      if(moving&&moving.type==='one-off'&&d.dateStr!==dateStr){e.preventDefault();todayList.classList.add('calendar-day-drop');}
+    });
+    todayList.addEventListener('dragleave',()=>todayList.classList.remove('calendar-day-drop'));
+    todayList.addEventListener('drop',e=>{
+      todayList.classList.remove('calendar-day-drop');let d;try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}
+      if(d.kind==='backlog'){e.preventDefault();e.stopPropagation();backlogToCalendar(d.backlogId,dateStr);return;}
+      const moving=tasks.find(x=>x.id===d.taskId);if(moving&&moving.type==='one-off'&&d.dateStr!==dateStr){e.preventDefault();e.stopPropagation();moveOneOffTask(d.taskId,dateStr);}
+    });
 
     col.querySelector('.add-oneoff-btn').addEventListener('click', () => openAddModal(dateStr));
     col.querySelectorAll('.section-rating .star').forEach(star => star.addEventListener('click', () => {
@@ -1631,6 +1651,31 @@ function scheduleBacklogItem(id,date){
  const lt=longTasks.find(x=>x.id===id);if(!lt)return;
  createOneOffTask(lt.text,date);longTasks=longTasks.filter(x=>x.id!==id);normalizeBacklog();saveLong(longTasks);render();renderLongTasks();
 }
+function ensureSectionOrders(){
+ backlogSections.forEach((x,i)=>{if(!Number.isFinite(x.sectionOrder))x.sectionOrder=i+1;});
+ backlogSections.sort((a,b)=>a.sectionOrder-b.sectionOrder);
+}
+function moveBacklogSection(movingId,targetId){
+ ensureSectionOrders();const a=backlogSections.findIndex(x=>x.id===movingId),b=backlogSections.findIndex(x=>x.id===targetId);if(a<0||b<0)return;
+ const [x]=backlogSections.splice(a,1);backlogSections.splice(b,0,x);backlogSections.forEach((x,i)=>x.sectionOrder=i+1);saveBacklogSections(backlogSections);renderLongTasks();
+}
+function calendarTaskToBacklog(taskId,sectionId='general'){
+ const t=tasks.find(x=>x.id===taskId);if(!t)return;
+ if(t.type==='recurring'){alert('Repeated tasks stay in the calendar. Duplicate or delete the routine if you no longer want it daily.');return;}
+ longTasks.push({id:uid(),text:t.name,sectionId,backlogOrder:longTasks.filter(x=>(x.sectionId||'general')===sectionId).length+1});
+ saveLong(longTasks);deleteTask(taskId);renderLongTasks();
+}
+function backlogToCalendar(backlogId,date){
+ const lt=longTasks.find(x=>x.id===backlogId);if(!lt)return;
+ createOneOffTask(lt.text,date);longTasks=longTasks.filter(x=>x.id!==backlogId);normalizeBacklog();saveLong(longTasks);render();renderLongTasks();
+}
+let datePickAction=null;
+function askPlannerDate(title,defaultDate,action){
+ datePickAction=action;document.getElementById('datePickTitle').textContent=title;document.getElementById('datePickInput').value=defaultDate||fmtDate(new Date());document.getElementById('datePickModal').style.display='flex';
+}
+document.getElementById('datePickCancel').onclick=()=>{document.getElementById('datePickModal').style.display='none';datePickAction=null};
+document.getElementById('datePickSave').onclick=()=>{const d=document.getElementById('datePickInput').value;if(!d||!datePickAction)return;const fn=datePickAction;datePickAction=null;document.getElementById('datePickModal').style.display='none';fn(d);};
+ensureSectionOrders();
 function renderLongTasks(){
  const list=document.getElementById('longTasksList');list.innerHTML='';if(!backlogSections.length)backlogSections=[{id:'general',name:'General'}];
  longTasks.forEach((t,i)=>{if(!t.sectionId)t.sectionId='general';if(!Number.isFinite(Number(t.backlogOrder)))t.backlogOrder=i+1});
@@ -1639,8 +1684,8 @@ function renderLongTasks(){
  w.querySelector('.ren').onclick=()=>{const n=prompt('Rename section',sec.name);if(n&&n.trim()){sec.name=n.trim();saveBacklogSections(backlogSections);renderLongTasks()}};const d=w.querySelector('.del');if(d)d.onclick=()=>{longTasks.forEach(t=>{if(t.sectionId===sec.id)t.sectionId='general'});backlogSections=backlogSections.filter(x=>x.id!==sec.id);normalizeBacklog();saveLong(longTasks);saveBacklogSections(backlogSections);renderLongTasks()};
  const box=w.querySelector('.backlog-section-items');longTasks.filter(t=>t.sectionId===sec.id).sort((a,b)=>a.backlogOrder-b.backlogOrder).forEach(lt=>{const item=document.createElement('div');item.className='long-task-item backlog-item';item.draggable=true;item.dataset.id=lt.id;item.innerHTML=`<span class="backlog-drag">≡</span><span class="long-task-text">${escHtml(lt.text)}</span><span class="backlog-schedule"><button class="btn tmr" title="Schedule tomorrow">Tomorrow</button><button class="btn wk" title="Schedule this week">This week</button><button class="btn dt" title="Choose date">Date</button></span><span class="long-task-del">&times;</span>`;
  item.querySelector('.tmr').onclick=e=>{e.stopPropagation();scheduleBacklogItem(lt.id,fmtDate(addDays(new Date(),1)))};
- item.querySelector('.wk').onclick=e=>{e.stopPropagation();const d=prompt('Date this week (YYYY-MM-DD)',fmtDate(new Date()));if(d)scheduleBacklogItem(lt.id,d)};
- item.querySelector('.dt').onclick=e=>{e.stopPropagation();const d=prompt('Schedule for date (YYYY-MM-DD)',fmtDate(addDays(new Date(),1)));if(d)scheduleBacklogItem(lt.id,d)};
+  item.querySelector('.wk').onclick=e=>{e.stopPropagation();askPlannerDate('Schedule this week',fmtDate(new Date()),d=>scheduleBacklogItem(lt.id,d))};
+  item.querySelector('.dt').onclick=e=>{e.stopPropagation();askPlannerDate('Choose date',fmtDate(addDays(new Date(),1)),d=>scheduleBacklogItem(lt.id,d))};
  item.querySelector('.long-task-del').onclick=e=>{e.stopPropagation();deleteLongTask(lt.id)};item.ondragstart=e=>{item.classList.add('dragging');e.dataTransfer.setData('text/plain',lt.id)};item.ondragend=()=>item.classList.remove('dragging');box.appendChild(item)});
  box.ondragover=e=>{e.preventDefault();const x=document.querySelector('.backlog-item.dragging');if(!x)return;const y=dragAfter(box,e.clientY);y?box.insertBefore(x,y):box.appendChild(x)};box.ondrop=e=>{e.preventDefault();const t=longTasks.find(x=>x.id===e.dataTransfer.getData('text/plain'));if(!t)return;t.sectionId=sec.id;[...box.querySelectorAll('.backlog-item')].forEach((el,i)=>{const q=longTasks.find(x=>x.id===el.dataset.id);if(q){q.sectionId=sec.id;q.backlogOrder=i+1}});normalizeBacklog();saveLong(longTasks);renderLongTasks()};list.appendChild(w)})}
 function dragAfter(c,y){return [...c.querySelectorAll('.backlog-item:not(.dragging)')].reduce((q,e)=>{const b=e.getBoundingClientRect(),o=y-b.top-b.height/2;return o<0&&o>q.o?{o,e}:q},{o:-Infinity}).e}
@@ -1806,7 +1851,7 @@ document.getElementById('pickerDuplicate').addEventListener('click',()=>{
 });
 document.getElementById('pickerTomorrow').addEventListener('click',()=>{if(pickerTarget)moveOneOffTask(pickerTarget.taskId,fmtDate(addDays(new Date(pickerTarget.dateStr+'T12:00:00'),1)))});
 document.getElementById('pickerNextWeek').addEventListener('click',()=>{if(pickerTarget)moveOneOffTask(pickerTarget.taskId,fmtDate(addDays(new Date(pickerTarget.dateStr+'T12:00:00'),7)))});
-document.getElementById('pickerPickDate').addEventListener('click',()=>{if(!pickerTarget)return;const d=prompt('Move to date (YYYY-MM-DD)',pickerTarget.dateStr);if(d&&/^\d{4}-\d{2}-\d{2}$/.test(d))moveOneOffTask(pickerTarget.taskId,d);});
+document.getElementById('pickerPickDate').addEventListener('click',()=>{if(!pickerTarget)return;const id=pickerTarget.taskId,def=pickerTarget.dateStr;closePicker();askPlannerDate('Move task to…',def,d=>moveOneOffTask(id,d));});
 document.getElementById('pickerDelete').addEventListener('click', () => {
   if (!pickerTarget) return;
   deleteTask(pickerTarget.taskId);
@@ -1976,6 +2021,11 @@ function deleteLongTask(id) {
   renderLongTasks();
 }
 
+const backlogDropZone=document.getElementById('longTasksList');
+backlogDropZone.addEventListener('dragover',e=>{let d;try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}if(d.kind==='calendar'){const t=tasks.find(x=>x.id===d.taskId);if(t&&t.type==='one-off'){e.preventDefault();backlogDropZone.classList.add('backlog-drop-active');}}});
+backlogDropZone.addEventListener('dragleave',()=>backlogDropZone.classList.remove('backlog-drop-active'));
+backlogDropZone.addEventListener('drop',e=>{backlogDropZone.classList.remove('backlog-drop-active');let d;try{d=JSON.parse(e.dataTransfer.getData('text/plain'));}catch{return;}if(d.kind==='calendar'){e.preventDefault();calendarTaskToBacklog(d.taskId,'general');}});
+
 document.getElementById('addLongTask').addEventListener('click', addLong);
 document.getElementById('longTaskInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') addLong();
@@ -2012,13 +2062,34 @@ function renderSearchResults(q){
  box.querySelectorAll('.search-result[data-live="true"]').forEach(el=>el.onclick=()=>{const t=tasks.find(x=>x.id===el.dataset.id);if(!t)return;document.getElementById('searchModal').style.display='none';const d=t.type==='one-off'?new Date(t.date+'T12:00:00'):new Date();selectedDay=d;currentMonday=weekStart(d);render();});
 }
 function openWeeklyReview(){
- lifetimeOccurrences=buildLifetimeOccurrences();const mon=weekStart(calendarView==='day'?selectedDay:currentMonday),start=fmtDate(mon),end=fmtDate(addDays(mon,6));
- const rows=lifetimeOccurrences.filter(x=>x.date>=start&&x.date<=end),done=rows.filter(x=>x.status==='complete'),rec=done.filter(x=>x.kind==='recurring').length,daily=done.filter(x=>x.kind==='daily').length;
- const byDay={};done.forEach(x=>byDay[x.date]=(byDay[x.date]||0)+1);const best=Object.entries(byDay).sort((a,b)=>b[1]-a[1])[0];
- document.getElementById('reviewTitle').textContent='Week Summary · '+fmtWeekLabel(mon);
- document.getElementById('reviewBody').innerHTML=`<div class="review-grid"><div class="review-stat"><strong>${done.length}</strong><span>completed</span></div><div class="review-stat"><strong>${rec}</strong><span>repeated</span></div><div class="review-stat"><strong>${daily}</strong><span>daily</span></div></div><div class="review-list">${best?'<b>Most productive day:</b> '+best[0]+' · '+best[1]+' completed<br>':''}<b>Priority tasks completed:</b> ${done.filter(x=>{const t=tasks.find(t=>t.id===x.taskId)||taskArchive[x.taskId];return t&&t.priority}).length}<br><span class="shortcut-hint">This review focuses on what you completed, not a failure percentage.</span></div>`;
+ lifetimeOccurrences=buildLifetimeOccurrences();
+ const mon=weekStart(calendarView==='day'?selectedDay:currentMonday),start=fmtDate(mon),end=fmtDate(addDays(mon,6));
+ const rows=lifetimeOccurrences.filter(x=>x.date>=start&&x.date<=end),done=rows.filter(x=>x.status==='complete');
+ const rec=done.filter(x=>x.kind==='recurring').length,daily=done.filter(x=>x.kind==='daily').length;
+ const priorityDone=done.filter(x=>{const t=tasks.find(t=>t.id===x.taskId)||taskArchive[x.taskId];return t&&t.priority}).length;
+ const byDay={};done.forEach(x=>byDay[x.date]=(byDay[x.date]||0)+1);
+ const best=Object.entries(byDay).sort((a,b)=>b[1]-a[1])[0];
+ const bestDate=best?new Date(best[0]+'T12:00:00'):null;
+ const bestLabel=bestDate?bestDate.toLocaleDateString(undefined,{weekday:'short',month:'short',day:'numeric',year:'numeric'}):'No completed tasks yet';
+
+ document.getElementById('reviewTitle').innerHTML='<span class="review-title-icon">▥</span> Week Summary <span class="review-range">'+fmtWeekLabel(mon)+'</span>';
+ document.getElementById('reviewBody').innerHTML=`
+   <div class="review-total-wrap">
+     <div class="review-main-total"><span class="review-check">✓</span><div><strong>${done.length}</strong><span>tasks completed</span></div></div>
+     <div class="review-breakdown">
+       <div class="review-break-card repeated"><span class="review-break-icon">↻</span><div><strong>${rec}</strong><span>repeated</span></div></div>
+       <div class="review-break-card daily"><span class="review-break-icon">☀</span><div><strong>${daily}</strong><span>daily</span></div></div>
+       <div class="review-equation">${rec} repeated + ${daily} daily = ${done.length} total completed</div>
+     </div>
+   </div>
+   <div class="review-priority"><span class="review-star">★</span><strong>${priorityDone}</strong><span>priority tasks completed</span></div>
+   <div class="review-best">
+     <div class="review-trophy">🏆</div>
+     <div class="review-best-copy"><span>MOST PRODUCTIVE DAY</span><strong>${bestLabel}</strong><em>${best?best[1]:0} tasks completed</em></div>
+   </div>`;
  document.getElementById('reviewModal').style.display='flex';
 }
+
 document.getElementById('searchBtn').onclick=openSearch;document.getElementById('reviewBtn').onclick=openWeeklyReview;
 document.getElementById('plannerSearch').addEventListener('input',e=>renderSearchResults(e.target.value));
 document.getElementById('closeSearch').onclick=()=>document.getElementById('searchModal').style.display='none';
