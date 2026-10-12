@@ -772,9 +772,21 @@
 .auth-card h2{margin:0 0 8px;font-size:24px}.auth-card p{margin:0 0 18px;color:#6b665f;line-height:1.45}.auth-card input{box-sizing:border-box;width:100%;font-size:16px;padding:12px 14px;margin:6px 0;border:1px solid #cbc5bc;border-radius:10px}.auth-card button{width:100%;margin-top:10px;padding:12px;border:0;border-radius:10px;background:#222;color:#fff;font-weight:700;font-size:15px;cursor:pointer}.auth-error{min-height:20px;color:#b42318;font-size:13px;margin-top:8px}.sync-pill{position:fixed;right:12px;bottom:12px;z-index:5000;background:rgba(255,255,255,.92);border:1px solid #ddd7ce;border-radius:999px;padding:6px 10px;font-size:11px;color:#6b665f;box-shadow:0 3px 12px rgba(0,0,0,.08)}
 .utility-wrap{position:relative}.utility-menu{position:absolute;right:0;top:calc(100% + 8px);width:210px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);padding:6px;z-index:1000}.utility-menu button{display:block;width:100%;text-align:left;border:0;background:transparent;color:var(--text);padding:10px 11px;border-radius:7px;font:inherit;cursor:pointer}.utility-menu button:hover{background:var(--surface2)}.utility-menu .danger{color:var(--red)}
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+
+/* v49 definitive auto-growing notes — must remain last so older compact rules cannot override it */
+.status-picker textarea#taskNotes.notes{
+  min-height:42px!important;
+  height:42px;
+  max-height:none!important;
+  overflow-y:hidden!important;
+  resize:none!important;
+  box-sizing:border-box!important;
+}
+
+.status-picker{overflow-y:auto!important;overscroll-behavior:contain}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v48-auto-growing-notes</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v49-definitive-auto-growing-notes</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -1832,8 +1844,9 @@ function normalizeBacklog(){backlogSections.forEach(s=>longTasks.filter(t=>t.sec
 // ── STATUS PICKER ────────────────────────────────────────────────
 function autoGrowTaskNotes(el){
  if(!el)return;
- el.style.height='38px';
- el.style.height=Math.max(38,el.scrollHeight)+'px';
+ el.style.height='auto';
+ const min=42;
+ el.style.height=Math.max(min,el.scrollHeight)+'px';
 }
 function noteKeyForTask(taskId,dateStr){
   const task=tasks.find(t=>t.id===taskId);
@@ -1855,7 +1868,8 @@ function openPicker(e, taskId, dateStr) {
   document.getElementById('taskTitleEdit').value=task.name;
   document.getElementById('pickerPriority').textContent=task.priority?'★ Priority':'☆ Priority';
   ['pickerTomorrow','pickerNextWeek','pickerPickDate'].forEach(id=>document.getElementById(id).style.display=task.type==='one-off'?'':'none');
-  picker.style.display='flex';picker.style.flexDirection='column';picker.style.visibility='hidden';picker.style.left='12px';picker.style.top='12px';
+  picker.style.display='flex';picker.style.flexDirection='column';picker.style.visibility='hidden';
+  requestAnimationFrame(()=>autoGrowTaskNotes(document.getElementById('taskNotes')));picker.style.left='12px';picker.style.top='12px';
   requestAnimationFrame(()=>{
     const margin=12,gap=7,rect=picker.getBoundingClientRect(),w=Math.min(rect.width,innerWidth-margin*2),h=Math.min(rect.height,innerHeight-margin*2);
     const anchor=e.currentTarget?.getBoundingClientRect?e.currentTarget.getBoundingClientRect():{left:e.clientX,right:e.clientX,top:e.clientY,bottom:e.clientY};
