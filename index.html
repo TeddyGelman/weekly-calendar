@@ -722,6 +722,9 @@
 #reviewModal .modal-actions{margin-top:12px}
 @media(max-width:700px){#reviewModal .planner-wide-modal{padding:13px}#reviewTitle{font-size:18px}.review-total-wrap{grid-template-columns:1fr}.review-main-total{border-right:0;border-bottom:1px solid var(--border)}.review-best{grid-template-columns:72px 1fr}.review-trophy svg{width:42px;height:42px}.review-best-copy strong{font-size:17px}.review-equation{font-size:8px}}
 
+/* v48 auto-growing task notes */
+.status-picker textarea.notes{min-height:38px!important;height:38px;max-height:none!important;overflow-y:hidden!important;resize:none!important;box-sizing:border-box}
+
 /* v47 precise task drag placement */
 .task-card.drag-before{box-shadow:inset 0 2px 0 var(--blue)!important}
 .task-card.drag-after{box-shadow:inset 0 -2px 0 var(--blue)!important}
@@ -771,7 +774,7 @@
 @media(max-width:700px){.sync-pill{bottom:calc(10px + env(safe-area-inset-bottom));right:10px}.utility-menu{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));top:auto;width:auto}.topbar h1{max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v47-precise-task-drag</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v48-auto-growing-notes</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -1827,6 +1830,11 @@ function dragAfter(c,y){return [...c.querySelectorAll('.backlog-item:not(.draggi
 function normalizeBacklog(){backlogSections.forEach(s=>longTasks.filter(t=>t.sectionId===s.id).sort((a,b)=>a.backlogOrder-b.backlogOrder).forEach((t,i)=>t.backlogOrder=i+1))}
 
 // ── STATUS PICKER ────────────────────────────────────────────────
+function autoGrowTaskNotes(el){
+ if(!el)return;
+ el.style.height='38px';
+ el.style.height=Math.max(38,el.scrollHeight)+'px';
+}
 function noteKeyForTask(taskId,dateStr){
   const task=tasks.find(t=>t.id===taskId);
   return task && task.type==='recurring' ? taskId + '_recurring' : taskId + '_' + dateStr;
@@ -1842,6 +1850,7 @@ function openPicker(e, taskId, dateStr) {
   const notesKey=noteKeyForTask(taskId,dateStr);
   if(task.type==='recurring' && notes[notesKey]==null){const legacy=taskId+'_'+dateStr;if(notes[legacy]){notes[notesKey]=notes[legacy];saveNotes(notes);}}
   document.getElementById('taskNotes').value=notes[notesKey]||'';
+  autoGrowTaskNotes(document.getElementById('taskNotes'));
   document.getElementById('pickerTitle').textContent=task.name;
   document.getElementById('taskTitleEdit').value=task.name;
   document.getElementById('pickerPriority').textContent=task.priority?'★ Priority':'☆ Priority';
@@ -1875,6 +1884,7 @@ document.getElementById('statusPicker').querySelectorAll('.status-option').forEa
 let titleSaveTimer=null;document.getElementById('taskTitleEdit').addEventListener('input',e=>{if(!pickerTarget)return;const t=tasks.find(x=>x.id===pickerTarget.taskId);if(!t)return;const v=e.target.value;clearTimeout(titleSaveTimer);titleSaveTimer=setTimeout(()=>{if(!v.trim())return;t.name=v.trim();document.getElementById('pickerTitle').textContent=t.name;saveTasks(tasks);render()},250)});
 let notesSaveTimer = null;
 document.getElementById('taskNotes').addEventListener('input', (e) => {
+  autoGrowTaskNotes(e.target);
   if (!pickerTarget) return;
   const key = noteKeyForTask(pickerTarget.taskId,pickerTarget.dateStr);
   notes[key] = e.target.value;
