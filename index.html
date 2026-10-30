@@ -784,9 +784,47 @@
 }
 
 .status-picker{overflow-y:auto!important;overscroll-behavior:contain}
+
+/* v50 Backlog board view */
+body.backlog-view .lifetime-bar{display:none!important}
+body.backlog-view .calendar-wrap{display:none!important}
+body.backlog-view .sidebar{
+  display:block!important;position:static!important;transform:none!important;width:100%!important;
+  max-width:none!important;height:auto!important;border:0!important;box-shadow:none!important;background:transparent!important;
+}
+body.backlog-view .main{display:block!important;max-width:none!important;width:100%!important;padding:14px 18px 24px!important}
+body.backlog-view .sidebar-inner{padding:0!important;max-width:none!important}
+body.backlog-view .sidebar-inner>h2{font-size:20px;margin:0 0 3px}
+body.backlog-view .sidebar-desc{margin:0 0 12px;color:var(--text2)}
+body.backlog-view .long-task-input-row{max-width:620px;margin-bottom:14px}
+body.backlog-view .long-tasks-list{
+  display:flex!important;align-items:flex-start!important;gap:12px!important;overflow-x:auto!important;
+  overflow-y:visible!important;padding:2px 2px 18px!important;scroll-snap-type:x proximity;
+}
+body.backlog-view .backlog-toolbar{flex:0 0 auto!important;order:9999;margin:0!important;align-self:flex-start}
+body.backlog-view .backlog-toolbar-hint{display:none!important}
+body.backlog-view .backlog-section{
+  flex:0 0 280px!important;width:280px!important;margin:0!important;overflow:visible!important;
+  scroll-snap-align:start;background:var(--surface);min-height:120px;
+}
+body.backlog-view .backlog-section-head{
+  min-height:42px!important;position:sticky;top:0;z-index:2;background:var(--surface2)!important;
+}
+body.backlog-view .backlog-section-items{min-height:72px!important;padding:7px!important}
+body.backlog-view .long-task-item{margin:0 0 6px!important;width:auto!important}
+body.backlog-view .backlog-section.section-drop{outline:2px solid var(--blue);outline-offset:2px}
+body.backlog-view .backlog-section.dragging-section{opacity:.5}
+body.backlog-view .week-nav{display:none!important}
+body.backlog-view #addTaskBtn{display:none!important}
+body.backlog-view #toggleSidebar{display:none!important}
+@media(max-width:700px){
+ body.backlog-view .main{padding:10px!important}
+ body.backlog-view .backlog-section{flex-basis:82vw!important;width:82vw!important}
+ body.backlog-view .long-task-input-row{max-width:none}
+}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v49-definitive-auto-growing-notes</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v50-backlog-board-view</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -811,6 +849,7 @@
   <div class="view-toggle" aria-label="Calendar view">
     <button class="view-btn active" id="weekViewBtn">Week</button>
     <button class="view-btn" id="dayViewBtn">Day</button>
+    <button class="view-btn" id="backlogViewBtn">Backlog</button>
   </div>
   <div class="week-nav">
     <button class="btn icon-only" id="prevWeek" title="Previous week">&#8592;</button>
@@ -1233,6 +1272,7 @@ let longTasks = loadLong();
 let ratings=loadRatings();
 let dueDates=loadDueDates(); let backlogSections=loadBacklogSections();
 let calendarView = localStorage.getItem(VIEW_KEY) || (window.matchMedia('(max-width: 700px)').matches ? 'day' : 'week');
+if(!['week','day','backlog'].includes(calendarView))calendarView=window.matchMedia('(max-width: 700px)').matches?'day':'week';
 let selectedDay = new Date();
 let currentMonday = weekStart(new Date());
 let pickerTarget = null; // { taskId, dateStr }
@@ -1368,9 +1408,14 @@ function renderLifetimeStats(){
 }
 
 function render() {
-  document.getElementById('weekLabel').textContent = calendarView === 'day' ? (DAY_NAMES[(selectedDay.getDay()+6)%7] + ', ' + MONTHS[selectedDay.getMonth()] + ' ' + selectedDay.getDate() + ', ' + selectedDay.getFullYear()) : fmtWeekLabel(currentMonday);
+  const isBacklog=calendarView==='backlog';
+  document.body.classList.toggle('backlog-view',isBacklog);
+  document.getElementById('weekLabel').textContent = calendarView === 'day' ? (DAY_NAMES[(selectedDay.getDay()+6)%7] + ', ' + MONTHS[selectedDay.getMonth()] + ' ' + selectedDay.getDate() + ', ' + selectedDay.getFullYear()) : (isBacklog ? 'Backlog' : fmtWeekLabel(currentMonday));
   document.getElementById('weekViewBtn').classList.toggle('active', calendarView === 'week');
   document.getElementById('dayViewBtn').classList.toggle('active', calendarView === 'day');
+  document.getElementById('backlogViewBtn').classList.toggle('active', isBacklog);
+  document.getElementById('sidebar').classList.toggle('open',isBacklog);
+  if(isBacklog){renderLongTasks();return;}
 
   const today = fmtDate(new Date());
   const grid = document.getElementById('weekGrid');
@@ -1820,7 +1865,7 @@ function renderLongTasks(){
    head.addEventListener('dragend',()=>{w.classList.remove('dragging-section');activeDragPayload=null});
    w.addEventListener('dragover',e=>{let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();w.classList.add('section-drop')}});
    w.addEventListener('dragleave',()=>w.classList.remove('section-drop'));
-   w.addEventListener('drop',e=>{w.classList.remove('section-drop');let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();e.stopPropagation();moveBacklogSection(d.sectionId,sec.id,e.clientY>w.getBoundingClientRect().top+w.getBoundingClientRect().height/2)}});
+   w.addEventListener('drop',e=>{w.classList.remove('section-drop');let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();e.stopPropagation();moveBacklogSection(d.sectionId,sec.id,document.body.classList.contains('backlog-view') ? e.clientX>w.getBoundingClientRect().left+w.getBoundingClientRect().width/2 : e.clientY>w.getBoundingClientRect().top+w.getBoundingClientRect().height/2)}});
    const box=w.querySelector('.backlog-section-items');
    longTasks.filter(t=>t.sectionId===sec.id).sort((a,b)=>a.backlogOrder-b.backlogOrder).forEach(lt=>{
      const item=document.createElement('div');item.className='long-task-item backlog-item';item.draggable=true;item.dataset.id=lt.id;
@@ -2081,14 +2126,21 @@ document.getElementById('dayViewBtn').addEventListener('click', () => {
   currentMonday = weekStart(selectedDay);
   render();
 });
+document.getElementById('backlogViewBtn').addEventListener('click', () => {
+  calendarView = 'backlog';
+  localStorage.setItem(VIEW_KEY, calendarView);
+  render();
+});
 
 // ── WEEK NAV ─────────────────────────────────────────────────────
 document.getElementById('prevWeek').addEventListener('click', () => {
+  if(calendarView==='backlog')calendarView='week';
   if (calendarView === 'day') { selectedDay = addDays(selectedDay, -1); currentMonday = weekStart(selectedDay); }
   else currentMonday = addDays(currentMonday, -7);
   render();
 });
 document.getElementById('nextWeek').addEventListener('click', () => {
+  if(calendarView==='backlog')calendarView='week';
   if (calendarView === 'day') { selectedDay = addDays(selectedDay, 1); currentMonday = weekStart(selectedDay); }
   else currentMonday = addDays(currentMonday, 7);
   render();
@@ -2099,7 +2151,9 @@ document.getElementById('todayBtn').addEventListener('click', () => {
 
 // ── SIDEBAR ──────────────────────────────────────────────────────
 document.getElementById('toggleSidebar').addEventListener('click', () => {
-  document.getElementById('sidebar').classList.toggle('open');
+  calendarView='backlog';
+  localStorage.setItem(VIEW_KEY,calendarView);
+  render();
 });
 
 function deleteLongTask(id) {
