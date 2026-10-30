@@ -951,7 +951,7 @@ body.backlog-view.section-drag-active .backlog-column-slot.active{
 }
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v58-masonry-backlog-columns</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v59-top-left-backlog-add</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -2359,9 +2359,21 @@ function deleteLongTask(id) {
   renderLongTasks();
 }
 
-document.getElementById('addLongTask').addEventListener('click', addLong);
+document.getElementById('addLongTask').addEventListener('click', () => {
+  const inp=document.getElementById('longTaskInput'),text=inp.value.trim();if(!text)return;
+  normalizeBacklog();ensureSectionOrders();
+  const topLeft=[...backlogSections].sort((a,b)=>
+    (Number(a.boardColumn)||1)-(Number(b.boardColumn)||1) ||
+    (Number(a.sectionOrder)||0)-(Number(b.sectionOrder)||0)
+  )[0];
+  const sectionId=topLeft?.id||'general';
+  const siblings=longTasks.filter(x=>(x.sectionId||'general')===sectionId);
+  const nextOrder=siblings.length?Math.max(...siblings.map(x=>Number(x.order)||0))+1:1;
+  longTasks.push({id:uid(),text,sectionId,order:nextOrder});
+  inp.value='';saveLong(longTasks);renderLongTasks();
+});
 document.getElementById('longTaskInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') addLong();
+  if (e.key === 'Enter') document.getElementById('addLongTask').click();
 });
 
 function addLong() {
