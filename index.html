@@ -816,15 +816,23 @@ body.backlog-view .backlog-section.section-drop{outline:2px solid var(--blue);ou
 body.backlog-view .backlog-section.dragging-section{opacity:.5}
 body.backlog-view .week-nav{display:none!important}
 body.backlog-view #addTaskBtn{display:none!important}
-body.backlog-view #toggleSidebar{display:none!important}
+
 @media(max-width:700px){
  body.backlog-view .main{padding:10px!important}
  body.backlog-view .backlog-section{flex-basis:82vw!important;width:82vw!important}
  body.backlog-view .long-task-input-row{max-width:none}
 }
+
+/* v51: true horizontal backlog board + preserved sidebar drawer */
+body.backlog-view .long-tasks-list{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:flex-start!important;justify-content:flex-start!important;gap:12px!important;width:100%!important;max-width:none!important;overflow-x:auto!important;overflow-y:visible!important}
+body.backlog-view .backlog-section{display:block!important;flex:0 0 clamp(260px,22vw,340px)!important;width:clamp(260px,22vw,340px)!important;max-width:none!important;margin:0!important}
+body.backlog-view .backlog-toolbar{flex:0 0 auto!important}
+body:not(.backlog-view) .sidebar.open{display:block}
+body.backlog-view .backlog-section.section-drop-before{box-shadow:-3px 0 0 var(--blue)!important}
+body.backlog-view .backlog-section.section-drop-after{box-shadow:3px 0 0 var(--blue)!important}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v50-backlog-board-view</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v51-backlog-board-and-sidebar</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -1414,7 +1422,9 @@ function render() {
   document.getElementById('weekViewBtn').classList.toggle('active', calendarView === 'week');
   document.getElementById('dayViewBtn').classList.toggle('active', calendarView === 'day');
   document.getElementById('backlogViewBtn').classList.toggle('active', isBacklog);
-  document.getElementById('sidebar').classList.toggle('open',isBacklog);
+  if(isBacklog)document.getElementById('sidebar').classList.add('open');
+  else if(document.body.dataset.lastPlannerView==='backlog')document.getElementById('sidebar').classList.remove('open');
+  document.body.dataset.lastPlannerView=calendarView;
   if(isBacklog){renderLongTasks();return;}
 
   const today = fmtDate(new Date());
@@ -1863,9 +1873,9 @@ function renderLongTasks(){
    const head=w.querySelector('.backlog-section-head');head.draggable=true;
    head.addEventListener('dragstart',e=>{if(e.target.closest('button')){e.preventDefault();return;}w.classList.add('dragging-section');e.dataTransfer.effectAllowed='move';activeDragPayload={kind:'backlog-section',sectionId:sec.id};e.dataTransfer.setData('text/plain',JSON.stringify(activeDragPayload))});
    head.addEventListener('dragend',()=>{w.classList.remove('dragging-section');activeDragPayload=null});
-   w.addEventListener('dragover',e=>{let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();w.classList.add('section-drop')}});
-   w.addEventListener('dragleave',()=>w.classList.remove('section-drop'));
-   w.addEventListener('drop',e=>{w.classList.remove('section-drop');let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();e.stopPropagation();moveBacklogSection(d.sectionId,sec.id,document.body.classList.contains('backlog-view') ? e.clientX>w.getBoundingClientRect().left+w.getBoundingClientRect().width/2 : e.clientY>w.getBoundingClientRect().top+w.getBoundingClientRect().height/2)}});
+   w.addEventListener('dragover',e=>{let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();w.classList.add('section-drop');if(document.body.classList.contains('backlog-view')){const r=w.getBoundingClientRect(),after=e.clientX>r.left+r.width/2;w.classList.toggle('section-drop-before',!after);w.classList.toggle('section-drop-after',after)}}});
+   w.addEventListener('dragleave',()=>w.classList.remove('section-drop','section-drop-before','section-drop-after'));
+   w.addEventListener('drop',e=>{w.classList.remove('section-drop','section-drop-before','section-drop-after');let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();e.stopPropagation();moveBacklogSection(d.sectionId,sec.id,document.body.classList.contains('backlog-view') ? e.clientX>w.getBoundingClientRect().left+w.getBoundingClientRect().width/2 : e.clientY>w.getBoundingClientRect().top+w.getBoundingClientRect().height/2)}});
    const box=w.querySelector('.backlog-section-items');
    longTasks.filter(t=>t.sectionId===sec.id).sort((a,b)=>a.backlogOrder-b.backlogOrder).forEach(lt=>{
      const item=document.createElement('div');item.className='long-task-item backlog-item';item.draggable=true;item.dataset.id=lt.id;
@@ -2151,9 +2161,10 @@ document.getElementById('todayBtn').addEventListener('click', () => {
 
 // ── SIDEBAR ──────────────────────────────────────────────────────
 document.getElementById('toggleSidebar').addEventListener('click', () => {
-  calendarView='backlog';
-  localStorage.setItem(VIEW_KEY,calendarView);
-  render();
+  const sidebar=document.getElementById('sidebar');
+  if(calendarView==='backlog'){
+    calendarView='week';localStorage.setItem(VIEW_KEY,calendarView);render();sidebar.classList.add('open');
+  }else sidebar.classList.toggle('open');
 });
 
 function deleteLongTask(id) {
