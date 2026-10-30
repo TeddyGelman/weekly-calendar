@@ -830,9 +830,44 @@ body.backlog-view .backlog-toolbar{flex:0 0 auto!important}
 body:not(.backlog-view) .sidebar.open{display:block}
 body.backlog-view .backlog-section.section-drop-before{box-shadow:-3px 0 0 var(--blue)!important}
 body.backlog-view .backlog-section.section-drop-after{box-shadow:3px 0 0 var(--blue)!important}
+
+/* v52 definitive full-width backlog board.
+   The legacy .sidebar-inner has width:300px; v50/v51 only removed max-width, not width. */
+body.backlog-view .main{
+  display:block!important;width:100%!important;max-width:none!important;min-width:0!important;
+  overflow:visible!important;box-sizing:border-box!important;
+}
+body.backlog-view #sidebar.sidebar,
+body.backlog-view #sidebar.sidebar.open{
+  display:block!important;width:100%!important;min-width:0!important;max-width:none!important;
+  flex:1 1 100%!important;overflow:visible!important;box-sizing:border-box!important;
+}
+body.backlog-view #sidebar .sidebar-inner{
+  width:100%!important;min-width:0!important;max-width:none!important;height:auto!important;
+  box-sizing:border-box!important;padding:0!important;
+}
+body.backlog-view #longTasksList.long-tasks-list{
+  width:100%!important;min-width:0!important;max-width:none!important;
+  display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;
+  align-items:flex-start!important;justify-content:flex-start!important;box-sizing:border-box!important;
+  overflow-x:auto!important;
+}
+body.backlog-view .backlog-section{
+  flex:1 1 0!important;
+  width:auto!important;
+  min-width:260px!important;
+  max-width:360px!important;
+}
+/* With only a few categories, actually use the available screen instead of leaving a huge blank area. */
+body.backlog-view #longTasksList.long-tasks-list:has(.backlog-section:nth-of-type(2):last-of-type) .backlog-section{max-width:none!important}
+body.backlog-view #longTasksList.long-tasks-list:has(.backlog-section:nth-of-type(3):last-of-type) .backlog-section{max-width:none!important}
+body.backlog-view #longTasksList.long-tasks-list:has(.backlog-section:nth-of-type(4):last-of-type) .backlog-section{max-width:none!important}
+@media(max-width:700px){
+ body.backlog-view .backlog-section{flex:0 0 82vw!important;width:82vw!important;min-width:82vw!important;max-width:82vw!important}
+}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v51-backlog-board-and-sidebar</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v52-full-width-backlog-board</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
