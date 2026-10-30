@@ -876,9 +876,38 @@ body.backlog-view .long-task-input-row input{min-width:0!important}
 .backlog-section-title-edit:hover,.backlog-section-title-edit:focus{border-color:var(--border);background:var(--bg)}
 .backlog-item-edit{background:transparent;border:1px solid transparent;color:var(--text);font:inherit;line-height:1.4;width:100%;min-width:0;min-height:24px;overflow:hidden;resize:none;padding:3px 4px;border-radius:5px;outline:none;box-sizing:border-box}
 .backlog-item-edit:hover,.backlog-item-edit:focus{border-color:var(--border);background:var(--bg)}
+
+/* v55 reliable category drag handle beside editable title */
+.section-grip{display:grid!important;place-items:center!important;width:24px!important;min-width:24px!important;height:30px!important;cursor:grab!important;user-select:none!important;border-radius:5px}
+.section-grip:hover{background:var(--bg)}
+.section-grip:active{cursor:grabbing!important}
+.backlog-section.dragging-section{opacity:.55!important}
+
+/* v56 2D backlog dashboard */
+body.backlog-view #longTasksList.long-tasks-list{
+  display:flex!important;flex-direction:column!important;align-items:stretch!important;
+  gap:14px!important;overflow-x:visible!important;
+}
+body.backlog-view .backlog-board-row{
+  display:flex!important;flex-flow:row nowrap!important;align-items:flex-start!important;
+  gap:12px!important;width:100%!important;min-width:0!important;overflow-x:auto!important;
+  padding:1px 2px 3px!important;box-sizing:border-box!important;
+}
+body.backlog-view .backlog-board-row .backlog-section{
+  flex:1 1 0!important;width:auto!important;min-width:260px!important;max-width:360px!important;
+}
+body.backlog-view .backlog-board-row:has(.backlog-section:nth-child(1):last-child) .backlog-section{max-width:360px!important;flex:0 1 360px!important}
+body.backlog-view .backlog-board-row:has(.backlog-section:nth-child(2):last-child) .backlog-section,
+body.backlog-view .backlog-board-row:has(.backlog-section:nth-child(3):last-child) .backlog-section,
+body.backlog-view .backlog-board-row:has(.backlog-section:nth-child(4):last-child) .backlog-section{max-width:none!important}
+body.backlog-view .backlog-section.section-drop-below{box-shadow:0 4px 0 var(--blue)!important;outline:none!important}
+@media(max-width:700px){
+ body.backlog-view .backlog-board-row{overflow-x:auto!important}
+ body.backlog-view .backlog-board-row .backlog-section{flex:0 0 82vw!important;width:82vw!important;min-width:82vw!important;max-width:82vw!important}
+}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v54-editable-backlog</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v56-2d-backlog-board</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -1848,16 +1877,39 @@ function scheduleBacklogItem(id,date){
  createOneOffTask(lt.text,date);longTasks=longTasks.filter(x=>x.id!==id);normalizeBacklog();saveLong(longTasks);render();renderLongTasks();
 }
 function ensureSectionOrders(){
- const hasSaved=backlogSections.every(x=>Number.isFinite(Number(x.sectionOrder)));
- if(hasSaved)backlogSections.sort((a,b)=>Number(a.sectionOrder)-Number(b.sectionOrder));
- else backlogSections.forEach((x,i)=>x.sectionOrder=i+1);
+ // v56: sections have a persistent board row plus an order within that row.
+ backlogSections.forEach((x,i)=>{
+   if(!Number.isFinite(Number(x.boardRow)))x.boardRow=1;
+   if(!Number.isFinite(Number(x.sectionOrder)))x.sectionOrder=i+1;
+ });
+ backlogSections.sort((a,b)=>Number(a.boardRow)-Number(b.boardRow)||Number(a.sectionOrder)-Number(b.sectionOrder));
+ // Normalize sparse legacy values without changing visual order.
+ const rows=[...new Set(backlogSections.map(x=>Number(x.boardRow)))].sort((a,b)=>a-b);
+ const rowMap=new Map(rows.map((r,i)=>[r,i+1]));
+ backlogSections.forEach(x=>x.boardRow=rowMap.get(Number(x.boardRow))||1);
+ [...new Set(backlogSections.map(x=>x.boardRow))].forEach(row=>{
+   backlogSections.filter(x=>x.boardRow===row).sort((a,b)=>a.sectionOrder-b.sectionOrder).forEach((x,i)=>x.sectionOrder=i+1);
+ });
+ backlogSections.sort((a,b)=>a.boardRow-b.boardRow||a.sectionOrder-b.sectionOrder);
 }
-function moveBacklogSection(movingId,targetId,placeAfter=false){
- const a=backlogSections.findIndex(x=>x.id===movingId),target=backlogSections.find(x=>x.id===targetId);if(a<0||!target)return;
- const [moving]=backlogSections.splice(a,1);
- let b=backlogSections.findIndex(x=>x.id===targetId);if(b<0)b=backlogSections.length;else if(placeAfter)b++;
- backlogSections.splice(b,0,moving);backlogSections.forEach((x,i)=>x.sectionOrder=i+1);
- backlogSections=[...backlogSections];saveBacklogSections(backlogSections);renderLongTasks();
+function moveBacklogSection2D(movingId,targetId,zone='after'){
+ const moving=backlogSections.find(x=>x.id===movingId),target=backlogSections.find(x=>x.id===targetId);
+ if(!moving||!target||moving===target)return;
+ ensureSectionOrders();
+ if(zone==='below'){
+   // Insert a brand-new row immediately below the target's row.
+   const targetRow=target.boardRow;
+   backlogSections.forEach(x=>{if(x.id!==moving.id&&x.boardRow>targetRow)x.boardRow++});
+   moving.boardRow=targetRow+1;moving.sectionOrder=1;
+ }else{
+   const row=target.boardRow;
+   moving.boardRow=row;
+   const peers=backlogSections.filter(x=>x.id!==moving.id&&x.boardRow===row).sort((a,b)=>a.sectionOrder-b.sectionOrder);
+   let idx=peers.findIndex(x=>x.id===target.id);if(idx<0)idx=peers.length;
+   if(zone==='after')idx++;
+   peers.splice(idx,0,moving);peers.forEach((x,i)=>x.sectionOrder=i+1);
+ }
+ ensureSectionOrders();backlogSections=[...backlogSections];saveBacklogSections(backlogSections);renderLongTasks();
 }
 function calendarTaskToBacklog(taskId,sectionId='general',insertIndex=null){
  captureUndo('Move task to backlog');
@@ -1910,8 +1962,16 @@ function renderLongTasks(){
  ensureSectionOrders();
  longTasks.forEach((t,i)=>{if(!t.sectionId)t.sectionId='general';if(!Number.isFinite(Number(t.backlogOrder)))t.backlogOrder=i+1});
  const addSectionBtn=document.getElementById('addBacklogSection');
- if(addSectionBtn)addSectionBtn.onclick=()=>{const n=prompt('Section name');if(n&&n.trim()){backlogSections.push({id:uid(),name:n.trim(),sectionOrder:backlogSections.length+1});saveBacklogSections(backlogSections);renderLongTasks()}};
+ if(addSectionBtn)addSectionBtn.onclick=()=>{const n=prompt('Section name');if(n&&n.trim()){const lastRow=Math.max(1,...backlogSections.map(x=>Number(x.boardRow)||1));const peers=backlogSections.filter(x=>(Number(x.boardRow)||1)===lastRow);backlogSections.push({id:uid(),name:n.trim(),boardRow:lastRow,sectionOrder:peers.length+1});saveBacklogSections(backlogSections);renderLongTasks()}};
+ let currentBoardRow=null,rowHost=list;
  backlogSections.forEach(sec=>{
+   if(document.body.classList.contains('backlog-view')){
+     if(currentBoardRow!==sec.boardRow){
+       currentBoardRow=sec.boardRow;
+       rowHost=document.createElement('div');rowHost.className='backlog-board-row';rowHost.dataset.boardRow=sec.boardRow;
+       list.appendChild(rowHost);
+     }
+   }else rowHost=list;
    const w=document.createElement('div');w.className='backlog-section';w.dataset.sectionId=sec.id;
    w.innerHTML=`<div class="backlog-section-head"><span class="section-grip">⋮⋮</span><input class="backlog-section-title backlog-section-title-edit" value="${escHtml(sec.name)}" aria-label="Category title"><button class="backlog-mini-btn ren">Edit</button>${sec.id==='general'?'':'<button class="backlog-mini-btn del">×</button>'}</div><div class="backlog-section-items"></div>`;
    const titleEdit=w.querySelector('.backlog-section-title-edit');
@@ -1922,12 +1982,26 @@ function renderLongTasks(){
    titleEdit.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();saveSectionTitle();titleEdit.blur()}else if(e.key==='Escape'){titleEdit.value=sec.name;titleEdit.blur()}});
    w.querySelector('.ren').onclick=e=>{e.stopPropagation();titleEdit.focus();titleEdit.select()};
    const del=w.querySelector('.del');if(del)del.onclick=e=>{e.stopPropagation();longTasks.forEach(t=>{if(t.sectionId===sec.id)t.sectionId='general'});backlogSections=backlogSections.filter(x=>x.id!==sec.id);normalizeBacklog();saveLong(longTasks);saveBacklogSections(backlogSections);renderLongTasks()};
-   const head=w.querySelector('.backlog-section-head');head.draggable=true;
-   head.addEventListener('dragstart',e=>{if(e.target.closest('button,input,textarea')){e.preventDefault();return;}w.classList.add('dragging-section');e.dataTransfer.effectAllowed='move';activeDragPayload={kind:'backlog-section',sectionId:sec.id};e.dataTransfer.setData('text/plain',JSON.stringify(activeDragPayload))});
-   head.addEventListener('dragend',()=>{w.classList.remove('dragging-section');activeDragPayload=null});
-   w.addEventListener('dragover',e=>{let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();w.classList.add('section-drop');if(document.body.classList.contains('backlog-view')){const r=w.getBoundingClientRect(),after=e.clientX>r.left+r.width/2;w.classList.toggle('section-drop-before',!after);w.classList.toggle('section-drop-after',after)}}});
-   w.addEventListener('dragleave',()=>w.classList.remove('section-drop','section-drop-before','section-drop-after'));
-   w.addEventListener('drop',e=>{w.classList.remove('section-drop','section-drop-before','section-drop-after');let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();e.stopPropagation();moveBacklogSection(d.sectionId,sec.id,document.body.classList.contains('backlog-view') ? e.clientX>w.getBoundingClientRect().left+w.getBoundingClientRect().width/2 : e.clientY>w.getBoundingClientRect().top+w.getBoundingClientRect().height/2)}});
+   const head=w.querySelector('.backlog-section-head'),grip=w.querySelector('.section-grip');
+   // The title is editable, so the grip is the guaranteed drag handle.
+   head.draggable=false;grip.draggable=true;grip.title='Drag category';
+   const startSectionDrag=e=>{e.stopPropagation();w.classList.add('dragging-section');e.dataTransfer.effectAllowed='move';activeDragPayload={kind:'backlog-section',sectionId:sec.id};e.dataTransfer.setData('text/plain',JSON.stringify(activeDragPayload))};
+   grip.addEventListener('dragstart',startSectionDrag);
+   grip.addEventListener('dragend',()=>{w.classList.remove('dragging-section');activeDragPayload=null});
+   // Neutral header space is draggable too, without stealing clicks from title/buttons.
+   head.addEventListener('mousedown',e=>{if(e.target===head){head.draggable=true}else head.draggable=false});
+   head.addEventListener('dragstart',e=>{if(e.target!==head){return;}startSectionDrag(e)});
+   head.addEventListener('dragend',()=>{head.draggable=false;w.classList.remove('dragging-section');activeDragPayload=null});
+   const sectionDropZone=e=>{
+     if(!document.body.classList.contains('backlog-view'))return e.clientY>w.getBoundingClientRect().top+w.getBoundingClientRect().height/2?'after':'before';
+     const r=w.getBoundingClientRect(),rx=(e.clientX-r.left)/r.width,ry=(e.clientY-r.top)/r.height;
+     // Bottom 32% means "put this category on a row below me"; otherwise left/right.
+     if(ry>.68)return 'below';
+     return rx<.5?'before':'after';
+   };
+   w.addEventListener('dragover',e=>{let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();const zone=sectionDropZone(e);w.classList.add('section-drop');w.classList.toggle('section-drop-before',zone==='before');w.classList.toggle('section-drop-after',zone==='after');w.classList.toggle('section-drop-below',zone==='below')}});
+   w.addEventListener('dragleave',()=>w.classList.remove('section-drop','section-drop-before','section-drop-after','section-drop-below'));
+   w.addEventListener('drop',e=>{const zone=sectionDropZone(e);w.classList.remove('section-drop','section-drop-before','section-drop-after','section-drop-below');let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();e.stopPropagation();moveBacklogSection2D(d.sectionId,sec.id,zone)}});
    const box=w.querySelector('.backlog-section-items');
    longTasks.filter(t=>t.sectionId===sec.id).sort((a,b)=>a.backlogOrder-b.backlogOrder).forEach(lt=>{
      const item=document.createElement('div');item.className='long-task-item backlog-item';item.draggable=true;item.dataset.id=lt.id;
@@ -1948,7 +2022,7 @@ function renderLongTasks(){
    box.addEventListener('dragover',e=>{let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog'||d.kind==='calendar'){e.preventDefault();box.classList.add('backlog-box-drop');if(d.kind==='backlog'){const x=document.querySelector('.backlog-item.dragging');if(x){const y=dragAfter(box,e.clientY);y?box.insertBefore(x,y):box.appendChild(x)}}}});
    box.addEventListener('dragleave',()=>box.classList.remove('backlog-box-drop'));
    box.addEventListener('drop',e=>{box.classList.remove('backlog-box-drop');let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='calendar'){e.preventDefault();e.stopPropagation();const afterEl=dragAfter(box,e.clientY);const children=[...box.querySelectorAll('.backlog-item')];const idx=afterEl?children.indexOf(afterEl):children.length;calendarTaskToBacklog(d.taskId,sec.id,idx);return}if(d.kind==='backlog'){e.preventDefault();e.stopPropagation();const t=longTasks.find(x=>x.id===d.backlogId);if(!t)return;t.sectionId=sec.id;[...box.querySelectorAll('.backlog-item')].forEach((el,i)=>{const q=longTasks.find(x=>x.id===el.dataset.id);if(q){q.sectionId=sec.id;q.backlogOrder=i+1}});normalizeBacklog();saveLong(longTasks);renderLongTasks()}});
-   list.appendChild(w);
+   rowHost.appendChild(w);
  });
  list.addEventListener('dragover',e=>{const d=activeDragPayload;if(d?.kind==='calendar'){e.preventDefault();list.classList.add('backlog-drop-active')}});
  list.addEventListener('dragleave',e=>{if(!list.contains(e.relatedTarget))list.classList.remove('backlog-drop-active')});
