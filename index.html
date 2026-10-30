@@ -913,9 +913,45 @@ body.backlog-view .backlog-row-slot{height:6px;min-height:6px;width:100%;border:
 body.backlog-view.section-drag-active .backlog-row-slot{height:42px;border-color:var(--border);color:var(--text2);background:rgba(255,255,255,.025)}
 body.backlog-view.section-drag-active .backlog-row-slot.active{height:54px;border-color:var(--blue);color:var(--text);background:rgba(96,165,250,.12)}
 body.backlog-view.section-drag-active .backlog-section.dragging-section{opacity:.35!important}
+
+/* v58 masonry backlog: independent vertical stacks in horizontal columns */
+body.backlog-view #longTasksList.long-tasks-list{
+  display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:flex-start!important;
+  gap:10px!important;width:100%!important;overflow-x:auto!important;overflow-y:visible!important;
+}
+body.backlog-view .backlog-board-column{
+  flex:1 1 0!important;min-width:280px!important;max-width:420px!important;
+  display:flex!important;flex-direction:column!important;gap:8px!important;align-items:stretch!important;
+}
+body.backlog-view .backlog-board-column .backlog-section{
+  width:100%!important;min-width:0!important;max-width:none!important;flex:0 0 auto!important;margin:0!important;
+}
+body.backlog-view .backlog-vertical-slot{
+  height:6px;min-height:6px;width:100%;border:1px dashed transparent;border-radius:7px;color:transparent;
+  display:flex;align-items:center;justify-content:center;font-size:10px;box-sizing:border-box;transition:.12s;
+}
+body.backlog-view.section-drag-active .backlog-vertical-slot{
+  height:38px;border-color:var(--border);color:var(--text2);background:rgba(255,255,255,.025);
+}
+body.backlog-view.section-drag-active .backlog-vertical-slot.active{
+  height:50px;border-color:var(--blue);color:var(--text);background:rgba(96,165,250,.12);
+}
+body.backlog-view .backlog-column-slot{
+  flex:0 0 6px;min-width:6px;min-height:150px;align-self:stretch;border:1px dashed transparent;border-radius:8px;
+  color:transparent;display:flex;align-items:center;justify-content:center;font-size:10px;writing-mode:vertical-rl;transition:.12s;
+}
+body.backlog-view.section-drag-active .backlog-column-slot{
+  flex-basis:48px;min-width:48px;border-color:var(--border);color:var(--text2);background:rgba(255,255,255,.025);
+}
+body.backlog-view.section-drag-active .backlog-column-slot.active{
+  flex-basis:70px;min-width:70px;border-color:var(--blue);color:var(--text);background:rgba(96,165,250,.12);
+}
+@media(max-width:700px){
+ body.backlog-view .backlog-board-column{flex:0 0 82vw!important;min-width:82vw!important;max-width:82vw!important}
+}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v57-streamlined-backlog-drag</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v58-masonry-backlog-columns</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -1885,69 +1921,48 @@ function scheduleBacklogItem(id,date){
  createOneOffTask(lt.text,date);longTasks=longTasks.filter(x=>x.id!==id);normalizeBacklog();saveLong(longTasks);render();renderLongTasks();
 }
 function ensureSectionOrders(){
- // v56: sections have a persistent board row plus an order within that row.
+ // v58 masonry board: persistent column + vertical position within that column.
  backlogSections.forEach((x,i)=>{
-   if(!Number.isFinite(Number(x.boardRow)))x.boardRow=1;
+   if(!Number.isFinite(Number(x.boardColumn)))x.boardColumn=Number.isFinite(Number(x.boardRow))?Number(x.boardRow):1;
    if(!Number.isFinite(Number(x.sectionOrder)))x.sectionOrder=i+1;
  });
- backlogSections.sort((a,b)=>Number(a.boardRow)-Number(b.boardRow)||Number(a.sectionOrder)-Number(b.sectionOrder));
- // Normalize sparse legacy values without changing visual order.
- const rows=[...new Set(backlogSections.map(x=>Number(x.boardRow)))].sort((a,b)=>a-b);
- const rowMap=new Map(rows.map((r,i)=>[r,i+1]));
- backlogSections.forEach(x=>x.boardRow=rowMap.get(Number(x.boardRow))||1);
- [...new Set(backlogSections.map(x=>x.boardRow))].forEach(row=>{
-   backlogSections.filter(x=>x.boardRow===row).sort((a,b)=>a.sectionOrder-b.sectionOrder).forEach((x,i)=>x.sectionOrder=i+1);
+ const cols=[...new Set(backlogSections.map(x=>Number(x.boardColumn)||1))].sort((a,b)=>a-b);
+ const colMap=new Map(cols.map((c,i)=>[c,i+1]));
+ backlogSections.forEach(x=>x.boardColumn=colMap.get(Number(x.boardColumn)||1)||1);
+ [...new Set(backlogSections.map(x=>x.boardColumn))].forEach(col=>{
+   backlogSections.filter(x=>x.boardColumn===col).sort((a,b)=>a.sectionOrder-b.sectionOrder).forEach((x,i)=>x.sectionOrder=i+1);
  });
- backlogSections.sort((a,b)=>a.boardRow-b.boardRow||a.sectionOrder-b.sectionOrder);
+ backlogSections.sort((a,b)=>a.boardColumn-b.boardColumn||a.sectionOrder-b.sectionOrder);
 }
-function moveBacklogSection2D(movingId,targetId,zone='after'){
- const moving=backlogSections.find(x=>x.id===movingId),target=backlogSections.find(x=>x.id===targetId);
- if(!moving||!target||moving===target)return;
- ensureSectionOrders();
- if(zone==='below'){
-   // Insert a brand-new row immediately below the target's row.
-   const targetRow=target.boardRow;
-   backlogSections.forEach(x=>{if(x.id!==moving.id&&x.boardRow>targetRow)x.boardRow++});
-   moving.boardRow=targetRow+1;moving.sectionOrder=1;
- }else{
-   const row=target.boardRow;
-   moving.boardRow=row;
-   const peers=backlogSections.filter(x=>x.id!==moving.id&&x.boardRow===row).sort((a,b)=>a.sectionOrder-b.sectionOrder);
-   let idx=peers.findIndex(x=>x.id===target.id);if(idx<0)idx=peers.length;
-   if(zone==='after')idx++;
-   peers.splice(idx,0,moving);peers.forEach((x,i)=>x.sectionOrder=i+1);
- }
- ensureSectionOrders();backlogSections=[...backlogSections];saveBacklogSections(backlogSections);renderLongTasks();
-}
-function moveBacklogSectionToSlot(movingId,row,index){
+function moveBacklogSectionToColumnSlot(movingId,column,index){
  const moving=backlogSections.find(x=>x.id===movingId);if(!moving)return;
  ensureSectionOrders();
- const targetRow=Math.max(1,Number(row)||1);
- const peers=backlogSections.filter(x=>x.id!==movingId&&x.boardRow===targetRow).sort((a,b)=>a.sectionOrder-b.sectionOrder);
+ const col=Math.max(1,Number(column)||1);
+ const peers=backlogSections.filter(x=>x.id!==movingId&&x.boardColumn===col).sort((a,b)=>a.sectionOrder-b.sectionOrder);
  const idx=Math.max(0,Math.min(Number(index)||0,peers.length));
- moving.boardRow=targetRow;peers.splice(idx,0,moving);peers.forEach((x,j)=>x.sectionOrder=j+1);
+ moving.boardColumn=col;peers.splice(idx,0,moving);peers.forEach((x,j)=>x.sectionOrder=j+1);
  ensureSectionOrders();backlogSections=[...backlogSections];saveBacklogSections(backlogSections);renderLongTasks();
 }
-function moveBacklogSectionToNewRow(movingId,insertAfterRow){
+function moveBacklogSectionToNewColumn(movingId,insertAfterColumn){
  const moving=backlogSections.find(x=>x.id===movingId);if(!moving)return;
  ensureSectionOrders();
- const after=Math.max(0,Number(insertAfterRow)||0);
- backlogSections.forEach(x=>{if(x.id!==movingId&&x.boardRow>after)x.boardRow++});
- moving.boardRow=after+1;moving.sectionOrder=1;
+ const after=Math.max(0,Number(insertAfterColumn)||0);
+ backlogSections.forEach(x=>{if(x.id!==movingId&&x.boardColumn>after)x.boardColumn++});
+ moving.boardColumn=after+1;moving.sectionOrder=1;
  ensureSectionOrders();backlogSections=[...backlogSections];saveBacklogSections(backlogSections);renderLongTasks();
 }
-function makeSectionSlot(row,index,label='Drop here'){
- const slot=document.createElement('div');slot.className='backlog-section-slot';slot.textContent=label;
+function makeVerticalSlot(column,index,label='Drop here'){
+ const slot=document.createElement('div');slot.className='backlog-vertical-slot';slot.textContent=label;
  slot.addEventListener('dragover',e=>{const d=activeDragPayload;if(d?.kind==='backlog-section'){e.preventDefault();e.stopPropagation();slot.classList.add('active')}});
  slot.addEventListener('dragleave',()=>slot.classList.remove('active'));
- slot.addEventListener('drop',e=>{const d=activeDragPayload;slot.classList.remove('active');if(d?.kind==='backlog-section'){e.preventDefault();e.stopPropagation();moveBacklogSectionToSlot(d.sectionId,row,index)}});
+ slot.addEventListener('drop',e=>{const d=activeDragPayload;slot.classList.remove('active');if(d?.kind==='backlog-section'){e.preventDefault();e.stopPropagation();moveBacklogSectionToColumnSlot(d.sectionId,column,index)}});
  return slot;
 }
-function makeRowSlot(afterRow){
- const slot=document.createElement('div');slot.className='backlog-row-slot';slot.innerHTML='<span>Drop here for a new row</span>';
+function makeColumnSlot(afterColumn){
+ const slot=document.createElement('div');slot.className='backlog-column-slot';slot.innerHTML='<span>Drop here for a new column</span>';
  slot.addEventListener('dragover',e=>{const d=activeDragPayload;if(d?.kind==='backlog-section'){e.preventDefault();e.stopPropagation();slot.classList.add('active')}});
  slot.addEventListener('dragleave',()=>slot.classList.remove('active'));
- slot.addEventListener('drop',e=>{const d=activeDragPayload;slot.classList.remove('active');if(d?.kind==='backlog-section'){e.preventDefault();e.stopPropagation();moveBacklogSectionToNewRow(d.sectionId,afterRow)}});
+ slot.addEventListener('drop',e=>{const d=activeDragPayload;slot.classList.remove('active');if(d?.kind==='backlog-section'){e.preventDefault();e.stopPropagation();moveBacklogSectionToNewColumn(d.sectionId,afterColumn)}});
  return slot;
 }
 function calendarTaskToBacklog(taskId,sectionId='general',insertIndex=null){
@@ -2001,20 +2016,20 @@ function renderLongTasks(){
  ensureSectionOrders();
  longTasks.forEach((t,i)=>{if(!t.sectionId)t.sectionId='general';if(!Number.isFinite(Number(t.backlogOrder)))t.backlogOrder=i+1});
  const addSectionBtn=document.getElementById('addBacklogSection');
- if(addSectionBtn)addSectionBtn.onclick=()=>{const n=prompt('Section name');if(n&&n.trim()){const lastRow=Math.max(1,...backlogSections.map(x=>Number(x.boardRow)||1));const peers=backlogSections.filter(x=>(Number(x.boardRow)||1)===lastRow);backlogSections.push({id:uid(),name:n.trim(),boardRow:lastRow,sectionOrder:peers.length+1});saveBacklogSections(backlogSections);renderLongTasks()}};
- let currentBoardRow=null,rowHost=list,rowSectionIndex=0;
+ if(addSectionBtn)addSectionBtn.onclick=()=>{const n=prompt('Section name');if(n&&n.trim()){const lastCol=Math.max(1,...backlogSections.map(x=>Number(x.boardColumn)||1));const peers=backlogSections.filter(x=>(Number(x.boardColumn)||1)===lastCol);backlogSections.push({id:uid(),name:n.trim(),boardColumn:lastCol,sectionOrder:peers.length+1});saveBacklogSections(backlogSections);renderLongTasks()}};
+ let currentBoardColumn=null,columnHost=list,columnSectionIndex=0;
  const fullBoard=document.body.classList.contains('backlog-view');
- if(fullBoard)list.appendChild(makeRowSlot(0));
+ if(fullBoard)list.appendChild(makeColumnSlot(0));
  backlogSections.forEach(sec=>{
    if(fullBoard){
-     if(currentBoardRow!==sec.boardRow){
-       if(currentBoardRow!==null)list.appendChild(makeRowSlot(currentBoardRow));
-       currentBoardRow=sec.boardRow;rowSectionIndex=0;
-       rowHost=document.createElement('div');rowHost.className='backlog-board-row';rowHost.dataset.boardRow=sec.boardRow;
-       rowHost.appendChild(makeSectionSlot(sec.boardRow,0,'Drop at start'));
-       list.appendChild(rowHost);
+     if(currentBoardColumn!==sec.boardColumn){
+       if(currentBoardColumn!==null)list.appendChild(makeColumnSlot(currentBoardColumn));
+       currentBoardColumn=sec.boardColumn;columnSectionIndex=0;
+       columnHost=document.createElement('div');columnHost.className='backlog-board-column';columnHost.dataset.boardColumn=sec.boardColumn;
+       columnHost.appendChild(makeVerticalSlot(sec.boardColumn,0,'Drop at top'));
+       list.appendChild(columnHost);
      }
-   }else rowHost=list;
+   }else columnHost=list;
    const w=document.createElement('div');w.className='backlog-section';w.dataset.sectionId=sec.id;
    w.innerHTML=`<div class="backlog-section-head"><span class="section-grip">⋮⋮</span><input class="backlog-section-title backlog-section-title-edit" value="${escHtml(sec.name)}" aria-label="Category title"><button class="backlog-mini-btn ren">Edit</button>${sec.id==='general'?'':'<button class="backlog-mini-btn del">×</button>'}</div><div class="backlog-section-items"></div>`;
    const titleEdit=w.querySelector('.backlog-section-title-edit');
@@ -2055,10 +2070,10 @@ function renderLongTasks(){
    box.addEventListener('dragover',e=>{let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog'||d.kind==='calendar'){e.preventDefault();box.classList.add('backlog-box-drop');if(d.kind==='backlog'){const x=document.querySelector('.backlog-item.dragging');if(x){const y=dragAfter(box,e.clientY);y?box.insertBefore(x,y):box.appendChild(x)}}}});
    box.addEventListener('dragleave',()=>box.classList.remove('backlog-box-drop'));
    box.addEventListener('drop',e=>{box.classList.remove('backlog-box-drop');let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='calendar'){e.preventDefault();e.stopPropagation();const afterEl=dragAfter(box,e.clientY);const children=[...box.querySelectorAll('.backlog-item')];const idx=afterEl?children.indexOf(afterEl):children.length;calendarTaskToBacklog(d.taskId,sec.id,idx);return}if(d.kind==='backlog'){e.preventDefault();e.stopPropagation();const t=longTasks.find(x=>x.id===d.backlogId);if(!t)return;t.sectionId=sec.id;[...box.querySelectorAll('.backlog-item')].forEach((el,i)=>{const q=longTasks.find(x=>x.id===el.dataset.id);if(q){q.sectionId=sec.id;q.backlogOrder=i+1}});normalizeBacklog();saveLong(longTasks);renderLongTasks()}});
-   rowHost.appendChild(w);
-   if(fullBoard){rowSectionIndex++;rowHost.appendChild(makeSectionSlot(sec.boardRow,rowSectionIndex,'Drop here'))}
+   columnHost.appendChild(w);
+   if(fullBoard){columnSectionIndex++;columnHost.appendChild(makeVerticalSlot(sec.boardColumn,columnSectionIndex,'Drop below'))}
  });
- if(fullBoard&&currentBoardRow!==null)list.appendChild(makeRowSlot(currentBoardRow));
+ if(fullBoard&&currentBoardColumn!==null)list.appendChild(makeColumnSlot(currentBoardColumn));
  list.addEventListener('dragover',e=>{const d=activeDragPayload;if(d?.kind==='calendar'){e.preventDefault();list.classList.add('backlog-drop-active')}});
  list.addEventListener('dragleave',e=>{if(!list.contains(e.relatedTarget))list.classList.remove('backlog-drop-active')});
  list.addEventListener('drop',e=>{list.classList.remove('backlog-drop-active');const d=activeDragPayload;if(d?.kind==='calendar'&&!e.target.closest('.backlog-section')){e.preventDefault();calendarTaskToBacklog(d.taskId,'general')}});
