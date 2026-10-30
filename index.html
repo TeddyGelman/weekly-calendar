@@ -865,9 +865,20 @@ body.backlog-view #longTasksList.long-tasks-list:has(.backlog-section:nth-of-typ
 @media(max-width:700px){
  body.backlog-view .backlog-section{flex:0 0 82vw!important;width:82vw!important;min-width:82vw!important;max-width:82vw!important}
 }
+
+/* v53 section control beside backlog-item input */
+.long-task-input-row .backlog-add-section{flex:0 0 auto;white-space:nowrap}
+body.backlog-view .long-task-input-row{display:flex!important;max-width:760px!important;align-items:center!important}
+body.backlog-view .long-task-input-row input{min-width:0!important}
+
+/* v54 inline backlog editing */
+.backlog-section-title-edit{background:transparent;border:1px solid transparent;color:var(--text);font:inherit;font-weight:800;min-width:0;width:100%;padding:3px 5px;border-radius:5px;outline:none}
+.backlog-section-title-edit:hover,.backlog-section-title-edit:focus{border-color:var(--border);background:var(--bg)}
+.backlog-item-edit{background:transparent;border:1px solid transparent;color:var(--text);font:inherit;line-height:1.4;width:100%;min-width:0;min-height:24px;overflow:hidden;resize:none;padding:3px 4px;border-radius:5px;outline:none;box-sizing:border-box}
+.backlog-item-edit:hover,.backlog-item-edit:focus{border-color:var(--border);background:var(--bg)}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v52-full-width-backlog-board</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v54-editable-backlog</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -931,7 +942,7 @@ body.backlog-view #longTasksList.long-tasks-list:has(.backlog-section:nth-of-typ
     <div class="sidebar-inner">
       <h2>📋 Backlog</h2>
       <p class="sidebar-desc">Long-term goals and tasks without a scheduled day.</p>
-      <div class="long-task-input-row">
+      <div class="long-task-input-row"><button class="backlog-mini-btn backlog-add-section" id="addBacklogSection" type="button">+ Section</button>
         <input type="text" id="longTaskInput" placeholder="Add a backlog item…" />
         <button class="btn primary" id="addLongTask">Add</button>
       </div>
@@ -1898,15 +1909,21 @@ function renderLongTasks(){
  if(!backlogSections.length)backlogSections=[{id:'general',name:'General',sectionOrder:1}];
  ensureSectionOrders();
  longTasks.forEach((t,i)=>{if(!t.sectionId)t.sectionId='general';if(!Number.isFinite(Number(t.backlogOrder)))t.backlogOrder=i+1});
- const bar=document.createElement('div');bar.className='backlog-toolbar';bar.innerHTML='<button class="backlog-mini-btn">+ Section</button><span class="backlog-toolbar-hint">Drag sections, tasks, or tasks to/from calendar</span>';
- bar.querySelector('button').onclick=()=>{const n=prompt('Section name');if(n&&n.trim()){backlogSections.push({id:uid(),name:n.trim(),sectionOrder:backlogSections.length+1});saveBacklogSections(backlogSections);renderLongTasks()}};list.appendChild(bar);
+ const addSectionBtn=document.getElementById('addBacklogSection');
+ if(addSectionBtn)addSectionBtn.onclick=()=>{const n=prompt('Section name');if(n&&n.trim()){backlogSections.push({id:uid(),name:n.trim(),sectionOrder:backlogSections.length+1});saveBacklogSections(backlogSections);renderLongTasks()}};
  backlogSections.forEach(sec=>{
    const w=document.createElement('div');w.className='backlog-section';w.dataset.sectionId=sec.id;
-   w.innerHTML=`<div class="backlog-section-head"><span class="section-grip">⋮⋮</span><div class="backlog-section-title">${escHtml(sec.name)}</div><button class="backlog-mini-btn ren">Rename</button>${sec.id==='general'?'':'<button class="backlog-mini-btn del">×</button>'}</div><div class="backlog-section-items"></div>`;
-   w.querySelector('.ren').onclick=e=>{e.stopPropagation();const n=prompt('Rename section',sec.name);if(n&&n.trim()){sec.name=n.trim();saveBacklogSections(backlogSections);renderLongTasks()}};
+   w.innerHTML=`<div class="backlog-section-head"><span class="section-grip">⋮⋮</span><input class="backlog-section-title backlog-section-title-edit" value="${escHtml(sec.name)}" aria-label="Category title"><button class="backlog-mini-btn ren">Edit</button>${sec.id==='general'?'':'<button class="backlog-mini-btn del">×</button>'}</div><div class="backlog-section-items"></div>`;
+   const titleEdit=w.querySelector('.backlog-section-title-edit');
+   const saveSectionTitle=()=>{const n=titleEdit.value.trim();if(!n){titleEdit.value=sec.name;return;}if(n!==sec.name){sec.name=n;saveBacklogSections(backlogSections)}};
+   titleEdit.addEventListener('mousedown',e=>e.stopPropagation());
+   titleEdit.addEventListener('dragstart',e=>{e.preventDefault();e.stopPropagation()});
+   titleEdit.addEventListener('blur',saveSectionTitle);
+   titleEdit.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();saveSectionTitle();titleEdit.blur()}else if(e.key==='Escape'){titleEdit.value=sec.name;titleEdit.blur()}});
+   w.querySelector('.ren').onclick=e=>{e.stopPropagation();titleEdit.focus();titleEdit.select()};
    const del=w.querySelector('.del');if(del)del.onclick=e=>{e.stopPropagation();longTasks.forEach(t=>{if(t.sectionId===sec.id)t.sectionId='general'});backlogSections=backlogSections.filter(x=>x.id!==sec.id);normalizeBacklog();saveLong(longTasks);saveBacklogSections(backlogSections);renderLongTasks()};
    const head=w.querySelector('.backlog-section-head');head.draggable=true;
-   head.addEventListener('dragstart',e=>{if(e.target.closest('button')){e.preventDefault();return;}w.classList.add('dragging-section');e.dataTransfer.effectAllowed='move';activeDragPayload={kind:'backlog-section',sectionId:sec.id};e.dataTransfer.setData('text/plain',JSON.stringify(activeDragPayload))});
+   head.addEventListener('dragstart',e=>{if(e.target.closest('button,input,textarea')){e.preventDefault();return;}w.classList.add('dragging-section');e.dataTransfer.effectAllowed='move';activeDragPayload={kind:'backlog-section',sectionId:sec.id};e.dataTransfer.setData('text/plain',JSON.stringify(activeDragPayload))});
    head.addEventListener('dragend',()=>{w.classList.remove('dragging-section');activeDragPayload=null});
    w.addEventListener('dragover',e=>{let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog-section'&&d.sectionId!==sec.id){e.preventDefault();w.classList.add('section-drop');if(document.body.classList.contains('backlog-view')){const r=w.getBoundingClientRect(),after=e.clientX>r.left+r.width/2;w.classList.toggle('section-drop-before',!after);w.classList.toggle('section-drop-after',after)}}});
    w.addEventListener('dragleave',()=>w.classList.remove('section-drop','section-drop-before','section-drop-after'));
@@ -1914,9 +1931,18 @@ function renderLongTasks(){
    const box=w.querySelector('.backlog-section-items');
    longTasks.filter(t=>t.sectionId===sec.id).sort((a,b)=>a.backlogOrder-b.backlogOrder).forEach(lt=>{
      const item=document.createElement('div');item.className='long-task-item backlog-item';item.draggable=true;item.dataset.id=lt.id;
-     item.innerHTML=`<span class="backlog-drag">≡</span><span class="long-task-text">${escHtml(lt.text)}</span><span class="long-task-del" role="button" aria-label="Delete" title="Delete">×</span>`;
+     item.innerHTML=`<span class="backlog-drag">≡</span><textarea class="long-task-text backlog-item-edit" rows="1" aria-label="Backlog item">${escHtml(lt.text)}</textarea><span class="long-task-del" role="button" aria-label="Delete" title="Delete">×</span>`;
+     const itemEdit=item.querySelector('.backlog-item-edit');
+     const growBacklogEdit=()=>{itemEdit.style.height='auto';itemEdit.style.height=Math.max(24,itemEdit.scrollHeight)+'px'};
+     const saveBacklogEdit=()=>{const v=itemEdit.value.trim();if(!v){itemEdit.value=lt.text;growBacklogEdit();return;}if(v!==lt.text){lt.text=v;saveLong(longTasks)}};
+     requestAnimationFrame(growBacklogEdit);
+     itemEdit.addEventListener('input',()=>{growBacklogEdit();lt.text=itemEdit.value;saveLong(longTasks)});
+     itemEdit.addEventListener('blur',saveBacklogEdit);
+     itemEdit.addEventListener('keydown',e=>{if(e.key==='Escape'){itemEdit.value=lt.text;growBacklogEdit();itemEdit.blur()}});
+     itemEdit.addEventListener('mousedown',e=>e.stopPropagation());
+     itemEdit.addEventListener('dragstart',e=>{e.preventDefault();e.stopPropagation()});
      item.querySelector('.long-task-del').onclick=e=>{e.stopPropagation();deleteLongTask(lt.id)};
-     item.addEventListener('dragstart',e=>{e.stopPropagation();item.classList.add('dragging');e.dataTransfer.effectAllowed='move';activeDragPayload={kind:'backlog',backlogId:lt.id,sectionId:sec.id};e.dataTransfer.setData('text/plain',JSON.stringify(activeDragPayload))});
+     item.addEventListener('dragstart',e=>{if(e.target.closest('textarea,input,button')){e.preventDefault();return;}e.stopPropagation();item.classList.add('dragging');e.dataTransfer.effectAllowed='move';activeDragPayload={kind:'backlog',backlogId:lt.id,sectionId:sec.id};e.dataTransfer.setData('text/plain',JSON.stringify(activeDragPayload))});
      item.addEventListener('dragend',()=>{item.classList.remove('dragging');activeDragPayload=null});box.appendChild(item);
    });
    box.addEventListener('dragover',e=>{let d=activeDragPayload;if(!d){try{d=JSON.parse(e.dataTransfer.getData('text/plain'))}catch{return}}if(d.kind==='backlog'||d.kind==='calendar'){e.preventDefault();box.classList.add('backlog-box-drop');if(d.kind==='backlog'){const x=document.querySelector('.backlog-item.dragging');if(x){const y=dragAfter(box,e.clientY);y?box.insertBefore(x,y):box.appendChild(x)}}}});
