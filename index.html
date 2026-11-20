@@ -951,7 +951,7 @@ body.backlog-view.section-drag-active .backlog-column-slot.active{
 }
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v59-top-left-backlog-add</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v60-safe-live-sync-no-undo</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -1200,7 +1200,7 @@ const SUPABASE_URL = 'https://yfvvulyoqfqajcgmnbps.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_lLkXO8vRNDzabKb6-Ra7FQ_LcpHonj1';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 let cloudUser = null, cloudReady = false, syncTimer = null, syncing = false;
-function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,dayOrders,taskTypeLedger,taskCreatedLedger,taskArchive,version:11}}
+function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,dayOrders,taskTypeLedger,taskCreatedLedger,taskArchive,version:12}}
 function applyCloudState(d){
   if(!d || typeof d !== 'object') return;
   if(Array.isArray(d.tasks)) tasks=d.tasks;
@@ -1216,33 +1216,125 @@ function applyCloudState(d){
 }
 function setSyncText(t){ const el=document.getElementById('syncPill'); if(el){el.style.display='block';el.textContent=t;} }
 let localRevision=0, syncedRevision=0;
+let cloudUpdatedAt=null, cloudBaseState=null, cloudPollTimer=null, pullingCloud=false;
+
+function cloneState(v){return JSON.parse(JSON.stringify(v))}
+function sameState(a,b){return JSON.stringify(a)===JSON.stringify(b)}
+function mergeMap3(base={},local={},remote={}){
+ const out={},keys=new Set([...Object.keys(base||{}),...Object.keys(local||{}),...Object.keys(remote||{})]);
+ keys.forEach(k=>{
+   const b=base?.[k],l=local?.[k],r=remote?.[k],lChanged=!sameState(l,b),rChanged=!sameState(r,b);
+   if(lChanged&&!rChanged){if(l!==undefined)out[k]=l}
+   else if(!lChanged&&rChanged){if(r!==undefined)out[k]=r}
+   else if(lChanged&&rChanged){
+     // If both touched the same key, prefer this device's current edit; unrelated keys still merge.
+     if(l!==undefined)out[k]=l;
+   }else if(l!==undefined)out[k]=l;
+ });
+ return out;
+}
+function mergeArrayById3(base=[],local=[],remote=[]){
+ const bm=new Map((base||[]).filter(x=>x&&x.id).map(x=>[x.id,x]));
+ const lm=new Map((local||[]).filter(x=>x&&x.id).map(x=>[x.id,x]));
+ const rm=new Map((remote||[]).filter(x=>x&&x.id).map(x=>[x.id,x]));
+ const ids=new Set([...bm.keys(),...lm.keys(),...rm.keys()]),out=[];
+ ids.forEach(id=>{
+   const b=bm.get(id),l=lm.get(id),r=rm.get(id),lChanged=!sameState(l,b),rChanged=!sameState(r,b);
+   let v;
+   if(lChanged&&!rChanged)v=l;
+   else if(!lChanged&&rChanged)v=r;
+   else if(lChanged&&rChanged){
+     if(l===undefined||r===undefined)v=l; // local delete/edit wins only for the same record
+     else v={...r,...l};                 // preserve remote fields, then this device's touched record
+   }else v=l;
+   if(v!==undefined)out.push(v);
+ });
+ // Preserve the local visual order first, then append genuinely remote additions.
+ const order=[...(local||[]).map(x=>x?.id),...(remote||[]).map(x=>x?.id)].filter(Boolean);
+ const rank=new Map();order.forEach((id,i)=>{if(!rank.has(id))rank.set(id,i)});
+ out.sort((a,b)=>(rank.get(a.id)??1e9)-(rank.get(b.id)??1e9));
+ return out;
+}
+function mergePlannerState(base,local,remote){
+ base=base||{};local=local||{};remote=remote||{};
+ const out={...remote,...local};
+ ['tasks','longTasks','backlogSections'].forEach(k=>out[k]=mergeArrayById3(base[k]||[],local[k]||[],remote[k]||[]));
+ ['statuses','notes','ratings','dueDates','dayOrders','taskTypeLedger','taskCreatedLedger','taskArchive'].forEach(k=>out[k]=mergeMap3(base[k]||{},local[k]||{},remote[k]||{}));
+ out.version=Math.max(Number(local.version)||0,Number(remote.version)||0,12);
+ return out;
+}
 function scheduleCloudSync(){
-  localRevision++;
-  if(!cloudReady||!cloudUser)return;
-  clearTimeout(syncTimer);
-  syncTimer=setTimeout(pushCloudState,350);
+ localRevision++;
+ if(!cloudReady||!cloudUser)return;
+ clearTimeout(syncTimer);
+ syncTimer=setTimeout(pushCloudState,350);
+}
+async function fetchCloudRow(){
+ if(!cloudUser)return null;
+ const {data,error}=await sb.from('calendar_state').select('data,updated_at').eq('user_id',cloudUser.id).maybeSingle();
+ if(error)throw error;
+ return data||null;
 }
 async function pushCloudState(){
-  if(!cloudReady||!cloudUser)return;
-  if(syncing){clearTimeout(syncTimer);syncTimer=setTimeout(pushCloudState,400);return;}
-  syncing=true;
-  const rev=localRevision, state=snapshotState();
-  setSyncText('Saving…');
-  const {error}=await sb.from('calendar_state').upsert({user_id:cloudUser.id,data:state},{onConflict:'user_id'});
-  syncing=false;
-  if(error){setSyncText('Sync error');console.error(error);return;}
-  syncedRevision=Math.max(syncedRevision,rev);
-  if(localRevision>rev){clearTimeout(syncTimer);syncTimer=setTimeout(pushCloudState,100);}
-  else setSyncText('Synced');
+ if(!cloudReady||!cloudUser||!navigator.onLine)return;
+ if(syncing){clearTimeout(syncTimer);syncTimer=setTimeout(pushCloudState,400);return;}
+ syncing=true;
+ const rev=localRevision;
+ try{
+   setSyncText('Saving…');
+   const row=await fetchCloudRow();
+   let local=snapshotState(),state=local;
+   if(row?.data && cloudUpdatedAt && row.updated_at!==cloudUpdatedAt){
+     // Another window/device saved since our last common version: merge before writing.
+     state=mergePlannerState(cloudBaseState||{},local,row.data);
+     applyCloudState(state);render();renderLongTasks();
+   }
+   const {data:written,error}=await sb.from('calendar_state')
+     .upsert({user_id:cloudUser.id,data:state},{onConflict:'user_id'})
+     .select('data,updated_at').single();
+   if(error)throw error;
+   cloudUpdatedAt=written.updated_at;cloudBaseState=cloneState(written.data||state);
+   syncedRevision=Math.max(syncedRevision,rev);
+   if(localRevision>rev){clearTimeout(syncTimer);syncTimer=setTimeout(pushCloudState,100)}
+   else setSyncText('Synced');
+ }catch(error){setSyncText('Sync error');console.error(error)}
+ finally{syncing=false}
+}
+async function pullCloudState(showStatus=false){
+ if(!cloudReady||!cloudUser||!navigator.onLine||syncing||pullingCloud)return;
+ pullingCloud=true;
+ try{
+   if(showStatus)setSyncText('Refreshing…');
+   const row=await fetchCloudRow();if(!row?.data)return;
+   if(!cloudUpdatedAt||row.updated_at!==cloudUpdatedAt){
+     if(localRevision>syncedRevision){
+       // Never discard dirty local work: merge it with the newer cloud copy, then save the merge.
+       const merged=mergePlannerState(cloudBaseState||{},snapshotState(),row.data);
+       applyCloudState(merged);
+       cloudUpdatedAt=row.updated_at;cloudBaseState=cloneState(row.data);
+       render();renderLongTasks();
+       pullingCloud=false;await pushCloudState();return;
+     }
+     applyCloudState(row.data);cloudUpdatedAt=row.updated_at;cloudBaseState=cloneState(row.data);
+     localRevision=syncedRevision=0;render();renderLongTasks();
+   }
+   setSyncText('Synced');
+ }catch(error){setSyncText('Sync error');console.error(error)}
+ finally{pullingCloud=false}
+}
+function startCloudAutoRefresh(){
+ clearInterval(cloudPollTimer);
+ cloudPollTimer=setInterval(()=>{if(document.visibilityState==='visible')pullCloudState(false)},3000);
 }
 async function openCloudCalendar(user){
-  cloudUser=user; setSyncText('Loading…');
-  const {data,error}=await sb.from('calendar_state').select('data').eq('user_id',user.id).maybeSingle();
-  if(error){ setSyncText('Sync error'); document.getElementById('authError').textContent=error.message; return; }
-  if(data && data.data){ applyCloudState(data.data); }
-  localRevision=0; syncedRevision=0;
-  cloudReady=true; document.getElementById('authGate').style.display='none'; render(); renderLongTasks();
-  if(!data) await pushCloudState(); else setSyncText('Synced');
+ cloudUser=user;setSyncText('Loading…');
+ try{
+   const row=await fetchCloudRow();
+   if(row?.data){applyCloudState(row.data);cloudUpdatedAt=row.updated_at;cloudBaseState=cloneState(row.data)}
+   localRevision=0;syncedRevision=0;cloudReady=true;
+   document.getElementById('authGate').style.display='none';render();renderLongTasks();startCloudAutoRefresh();
+   if(!row)await pushCloudState();else setSyncText('Synced');
+ }catch(error){setSyncText('Sync error');document.getElementById('authError').textContent=error.message}
 }
 async function bootAuth(){
   const {data:{session}}=await sb.auth.getSession(); if(session?.user) return openCloudCalendar(session.user);
@@ -1405,15 +1497,6 @@ let currentMonday = weekStart(new Date());
 let pickerTarget = null; // { taskId, dateStr }
 let activeDragPayload=null; // reliable drag state for dragover/drop; dataTransfer remains fallback
 
-let undoStack=[];
-function captureUndo(label){
- undoStack.push({label,state:JSON.parse(JSON.stringify(snapshotState()))});
- if(undoStack.length>20)undoStack.shift();
-}
-function undoLastAction(){
- const u=undoStack.pop();if(!u)return;
- applyCloudState(u.state);scheduleCloudSync();render();renderLongTasks();setSyncText('Undo restored');
-}
 
 
 // ── RENDER ───────────────────────────────────────────────────────
@@ -1676,7 +1759,6 @@ function render() {
         // Moving a one-off from another day: preserve the exact gap position too.
         if(d.dateStr!==dateStr){
           if(moving.type!=='one-off'||list!==todayList)return;
-          captureUndo('Move task between days');
           if(nextCard)moveOneOffTaskAt(d.taskId,dateStr,nextCard.dataset.taskId,false);
           else if(prevCard)moveOneOffTaskAt(d.taskId,dateStr,prevCard.dataset.taskId,true);
           else moveOneOffTaskAt(d.taskId,dateStr);
@@ -1741,8 +1823,7 @@ function render() {
           const moving=tasks.find(x=>x.id===d.taskId);
           if(!d || d.taskId===t.id || !moving)return;
           if(d.dateStr!==dateStr){
-            if(moving.type!=='one-off'||t.type!=='one-off')return;
-            captureUndo('Move task between days');moveOneOffTaskAt(d.taskId,dateStr,t.id,after);return;
+            if(moving.type!=='one-off'||t.type!=='one-off')return;moveOneOffTaskAt(d.taskId,dateStr,t.id,after);return;
           }
           if(moving.type!==t.type)return;
           dragTaskOnDate(d.taskId,t.id,dateStr,after);
@@ -1797,7 +1878,7 @@ function render() {
 function deleteTask(taskId,skipUndo=false) {
   const task = tasks.find(t => t.id === taskId);
   if (!task) return;
-  if(!skipUndo)captureUndo('Delete task');
+  if(!skipUndo)
   taskArchive[taskId]={...task,deletedAt:new Date().toISOString(),notes:Object.fromEntries(Object.entries(notes||{}).filter(([k])=>k.startsWith(taskId+'_')))};
   saveTaskArchive(taskArchive);
 
@@ -1966,7 +2047,6 @@ function makeColumnSlot(afterColumn){
  return slot;
 }
 function calendarTaskToBacklog(taskId,sectionId='general',insertIndex=null){
- captureUndo('Move task to backlog');
  const t=tasks.find(x=>x.id===taskId);if(!t)return;
  if(t.type==='recurring'){alert('Repeated tasks stay in the calendar. Duplicate or delete the routine if you no longer want it daily.');return;}
  const arr=longTasks.filter(x=>(x.sectionId||'general')===sectionId).sort((a,b)=>a.backlogOrder-b.backlogOrder);
@@ -1977,7 +2057,6 @@ function calendarTaskToBacklog(taskId,sectionId='general',insertIndex=null){
  saveLong(longTasks);deleteTask(taskId,true);renderLongTasks();
 }
 function backlogToCalendar(backlogId,date,targetId=null,placeAfter=false){
- captureUndo('Schedule backlog item');
  const lt=longTasks.find(x=>x.id===backlogId);if(!lt)return;
  const t=createOneOffTask(lt.text,date);
  longTasks=longTasks.filter(x=>x.id!==backlogId);normalizeBacklog();saveLong(longTasks);
@@ -2170,7 +2249,6 @@ document.getElementById('pickerDuplicate').addEventListener('click',()=>{
 document.getElementById('pickerTomorrow').addEventListener('click',()=>{
  if(!pickerTarget)return;
  const source=tasks.find(x=>x.id===pickerTarget.taskId);if(!source||source.type!=='one-off')return;
- captureUndo('Carry task to tomorrow');
  const tomorrow=fmtDate(addDays(new Date(pickerTarget.dateStr+'T12:00:00'),1));
  createOneOffTask(source.name,tomorrow,{priority:!!source.priority,note:notes[noteKeyForTask(source.id,pickerTarget.dateStr)]||''});
  // Deliberately keep the original task, status and date untouched so an unfinished
@@ -2353,7 +2431,6 @@ document.getElementById('toggleSidebar').addEventListener('click', () => {
 });
 
 function deleteLongTask(id) {
-  captureUndo('Delete backlog item');
   longTasks = longTasks.filter(lt => lt.id !== id);
   saveLong(longTasks);
   renderLongTasks();
@@ -2477,7 +2554,7 @@ document.getElementById('closeSearch').onclick=()=>document.getElementById('sear
 document.getElementById('closeReview').onclick=()=>document.getElementById('reviewModal').style.display='none';
 document.getElementById('reviewModal').addEventListener('click',e=>{if(e.target===document.getElementById('reviewModal'))document.getElementById('reviewModal').style.display='none';});
 document.addEventListener('keydown',e=>{
- if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'&&!e.shiftKey){e.preventDefault();undoLastAction();return;}
+ 
  if(e.key==='Escape'){document.getElementById('searchModal').style.display='none';document.getElementById('reviewModal').style.display='none';document.getElementById('infoModal').style.display='none';closePicker();return;}
  const tag=(e.target.tagName||'').toLowerCase();if(['input','textarea','select'].includes(tag)||e.metaKey||e.ctrlKey||e.altKey)return;
  if(e.key==='/' ){e.preventDefault();openSearch();}
@@ -2489,16 +2566,10 @@ document.addEventListener('keydown',e=>{
 });
 
 // ── CLOUD / BACKUP UTILITIES ─────────────────────────────────────
-async function pullCloudState(showStatus=true) {
-  if(localRevision>syncedRevision || syncing) return;
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')pullCloudState(false)});
+window.addEventListener('focus',()=>pullCloudState(false));
+window.addEventListener('online',()=>{pullCloudState(false);if(localRevision>syncedRevision)scheduleCloudSync()});
 
-  if (!cloudUser) return;
-  if (showStatus) setSyncText('Refreshing…');
-  const {data,error}=await sb.from('calendar_state').select('data').eq('user_id',cloudUser.id).maybeSingle();
-  if (error) { setSyncText('Sync error'); console.error(error); return; }
-  if (data?.data) { applyCloudState(data.data); render(); renderLongTasks(); }
-  setSyncText(navigator.onLine ? 'Synced' : 'Offline');
-}
 function downloadBackup(){
   const payload={exportedAt:new Date().toISOString(),calendar:snapshotState()};
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
@@ -2520,7 +2591,7 @@ document.getElementById('refreshCloud').addEventListener('click',()=>{utilityMen
 document.getElementById('exportBackup').addEventListener('click',()=>{utilityMenu.style.display='none';downloadBackup();});
 document.getElementById('importBackup').addEventListener('click',()=>{utilityMenu.style.display='none';document.getElementById('backupFile').click();});
 document.getElementById('backupFile').addEventListener('change',e=>{if(e.target.files[0])restoreBackup(e.target.files[0]);e.target.value='';});
-document.getElementById('signOutBtn').addEventListener('click',async()=>{utilityMenu.style.display='none';await sb.auth.signOut();cloudUser=null;cloudReady=false;document.getElementById('authGate').style.display='flex';document.getElementById('syncPill').style.display='none';});
+document.getElementById('signOutBtn').addEventListener('click',async()=>{utilityMenu.style.display='none';await sb.auth.signOut();clearInterval(cloudPollTimer);cloudUser=null;cloudReady=false;cloudUpdatedAt=null;cloudBaseState=null;document.getElementById('authGate').style.display='flex';document.getElementById('syncPill').style.display='none';});
 window.addEventListener('online',()=>{
   setSyncText('Online');
   if(localRevision>syncedRevision) pushCloudState();
