@@ -949,9 +949,20 @@ body.backlog-view.section-drag-active .backlog-column-slot.active{
 @media(max-width:700px){
  body.backlog-view .backlog-board-column{flex:0 0 82vw!important;min-width:82vw!important;max-width:82vw!important}
 }
+
+/* v61 task checklists */
+.task-checklist{margin-top:6px;border-top:1px solid var(--border);padding-top:6px}
+.checklist-toggle{width:100%;border:0;background:transparent;color:var(--text2);display:grid;grid-template-columns:1fr auto auto;gap:7px;align-items:center;text-align:left;padding:4px 1px;cursor:pointer;font:inherit;font-size:10px;font-weight:700}
+.checklist-summary{font-size:9px;font-weight:600;color:var(--text2)}.checklist-chevron{font-size:11px}
+.checklist-body{display:none;padding-top:5px}.checklist-body.open{display:block}.checklist-items{display:flex;flex-direction:column;gap:4px}
+.checklist-row{display:grid;grid-template-columns:14px 18px minmax(0,1fr) 20px;align-items:center;gap:5px;border:1px solid var(--border);border-radius:6px;background:var(--surface);padding:4px 5px}
+.checklist-row.checklist-drop{border-color:var(--blue)}.checklist-grip{cursor:grab;color:var(--text2);font-size:11px;user-select:none}.checklist-check{width:14px;height:14px;margin:0;accent-color:var(--green)}
+.checklist-text{width:100%;min-width:0;border:0;background:transparent;color:var(--text);font:inherit;font-size:10px;outline:none;padding:2px}.checklist-check:checked+.checklist-text{text-decoration:line-through;color:var(--text2)}
+.checklist-delete{border:0;background:transparent;color:var(--text2);cursor:pointer;font-size:14px;padding:0}.checklist-delete:hover{color:var(--red)}
+.checklist-add{margin-top:5px;border:1px dashed var(--border);background:transparent;color:var(--text2);border-radius:6px;padding:5px 7px;width:100%;font:inherit;font-size:9px;cursor:pointer}.checklist-add:hover{border-color:var(--blue);color:var(--text)}
 </style>
 </head>
-<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v60-safe-live-sync-no-undo</div>
+<body><div style="position:fixed;right:6px;bottom:6px;z-index:99999;font:10px sans-serif;opacity:.55">v61-recurring-task-checklists</div>
 <div id="authGate">
   <div class="auth-card">
     <h2>Weekly Calendar</h2>
@@ -1190,6 +1201,13 @@ body.backlog-view.section-drag-active .backlog-column-slot.active{
     <div class="notes-label">Notes / Instructions</div>
     <textarea class="notes" id="taskNotes" placeholder="Type notes / instructions for this task…"></textarea>
     <div class="notes-hint">Saved automatically. Recurring-task notes apply to every day; one-off notes stay with that dated task.</div>
+    <div class="task-checklist" id="taskChecklist">
+      <button class="checklist-toggle" id="checklistToggle" type="button"><span>☑ Checklist</span><span class="checklist-summary" id="checklistSummary">0 / 0</span><span class="checklist-chevron" id="checklistChevron">⌄</span></button>
+      <div class="checklist-body" id="checklistBody">
+        <div class="checklist-items" id="checklistItems"></div>
+        <button class="checklist-add" id="checklistAdd" type="button">+ Add checklist item</button>
+      </div>
+    </div>
   </div>
   <div class="picker-del" id="pickerDelete">&#128465; Delete task…</div>
 </div>
@@ -1200,14 +1218,14 @@ const SUPABASE_URL = 'https://yfvvulyoqfqajcgmnbps.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_lLkXO8vRNDzabKb6-Ra7FQ_LcpHonj1';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 let cloudUser = null, cloudReady = false, syncTimer = null, syncing = false;
-function snapshotState(){return {tasks,statuses,notes,longTasks,ratings,dueDates,backlogSections,dayOrders,taskTypeLedger,taskCreatedLedger,taskArchive,version:12}}
+function snapshotState(){return {tasks,statuses,notes,checklistTemplates,checklistChecks,longTasks,ratings,dueDates,backlogSections,dayOrders,taskTypeLedger,taskCreatedLedger,taskArchive,version:13}}
 function applyCloudState(d){
   if(!d || typeof d !== 'object') return;
   if(Array.isArray(d.tasks)) tasks=d.tasks;
-  if(d.statuses) statuses=d.statuses; if(d.notes) notes=d.notes;
+  if(d.statuses) statuses=d.statuses; if(d.notes) notes=d.notes; if(d.checklistTemplates) checklistTemplates=d.checklistTemplates; if(d.checklistChecks) checklistChecks=d.checklistChecks;
   if(Array.isArray(d.longTasks)) longTasks=d.longTasks; if(d.ratings) ratings=d.ratings; if(d.dueDates) dueDates=d.dueDates; if(Array.isArray(d.backlogSections)) backlogSections=d.backlogSections;
   localStorage.setItem(TASKS_KEY,JSON.stringify(tasks)); localStorage.setItem(STATUS_KEY,JSON.stringify(statuses));
-  localStorage.setItem(NOTES_KEY,JSON.stringify(notes)); localStorage.setItem(LONG_KEY,JSON.stringify(longTasks));
+  localStorage.setItem(NOTES_KEY,JSON.stringify(notes)); localStorage.setItem(CHECKLIST_TEMPLATES_KEY,JSON.stringify(checklistTemplates)); localStorage.setItem(CHECKLIST_CHECKS_KEY,JSON.stringify(checklistChecks)); localStorage.setItem(LONG_KEY,JSON.stringify(longTasks));
   localStorage.setItem(RATINGS_KEY,JSON.stringify(ratings)); localStorage.setItem(DUE_KEY,JSON.stringify(dueDates)); localStorage.setItem(BACKLOG_SECTIONS_KEY,JSON.stringify(backlogSections));
   if(d.dayOrders && typeof d.dayOrders==='object'){dayOrders=d.dayOrders;localStorage.setItem(DAY_ORDER_KEY,JSON.stringify(dayOrders));}
   if(d.taskTypeLedger && typeof d.taskTypeLedger==='object'){taskTypeLedger=d.taskTypeLedger;localStorage.setItem(TASK_TYPE_LEDGER_KEY,JSON.stringify(taskTypeLedger));}
@@ -1259,8 +1277,8 @@ function mergePlannerState(base,local,remote){
  base=base||{};local=local||{};remote=remote||{};
  const out={...remote,...local};
  ['tasks','longTasks','backlogSections'].forEach(k=>out[k]=mergeArrayById3(base[k]||[],local[k]||[],remote[k]||[]));
- ['statuses','notes','ratings','dueDates','dayOrders','taskTypeLedger','taskCreatedLedger','taskArchive'].forEach(k=>out[k]=mergeMap3(base[k]||{},local[k]||{},remote[k]||{}));
- out.version=Math.max(Number(local.version)||0,Number(remote.version)||0,12);
+ ['statuses','notes','checklistTemplates','checklistChecks','ratings','dueDates','dayOrders','taskTypeLedger','taskCreatedLedger','taskArchive'].forEach(k=>out[k]=mergeMap3(base[k]||{},local[k]||{},remote[k]||{}));
+ out.version=Math.max(Number(local.version)||0,Number(remote.version)||0,13);
  return out;
 }
 function scheduleCloudSync(){
@@ -1352,6 +1370,8 @@ document.getElementById('authPassword').addEventListener('keydown',e=>{if(e.key=
 const TASKS_KEY = 'wc_tasks_v2';
 const STATUS_KEY = 'wc_statuses_v2';
 const NOTES_KEY = 'wc_notes_v1';
+const CHECKLIST_TEMPLATES_KEY='wc_checklist_templates_v1';
+const CHECKLIST_CHECKS_KEY='wc_checklist_checks_v1';
 const LONG_KEY = 'wc_long_v2';
 const RATINGS_KEY = 'wc_ratings_v1';
 const DUE_KEY='wc_due_v1'; const BACKLOG_SECTIONS_KEY='wc_backlog_sections_v1';
@@ -1397,6 +1417,10 @@ function loadNotes() {
   catch { return {}; }
 }
 function saveNotes(n) { localStorage.setItem(NOTES_KEY, JSON.stringify(n)); scheduleCloudSync(); }
+function loadChecklistTemplates(){try{return JSON.parse(localStorage.getItem(CHECKLIST_TEMPLATES_KEY)||'{}')}catch{return {}}}
+function saveChecklistTemplates(v){localStorage.setItem(CHECKLIST_TEMPLATES_KEY,JSON.stringify(v));scheduleCloudSync()}
+function loadChecklistChecks(){try{return JSON.parse(localStorage.getItem(CHECKLIST_CHECKS_KEY)||'{}')}catch{return {}}}
+function saveChecklistChecks(v){localStorage.setItem(CHECKLIST_CHECKS_KEY,JSON.stringify(v));scheduleCloudSync()}
 function loadLong() {
   try { return JSON.parse(localStorage.getItem(LONG_KEY) || '[]'); }
   catch { return []; }
@@ -1487,6 +1511,8 @@ tasks.forEach(t=>{
 });
 localStorage.setItem(TASK_CREATED_LEDGER_KEY,JSON.stringify(taskCreatedLedger));
 let notes = loadNotes();
+let checklistTemplates=loadChecklistTemplates();
+let checklistChecks=loadChecklistChecks();
 let longTasks = loadLong();
 let ratings=loadRatings();
 let dueDates=loadDueDates(); let backlogSections=loadBacklogSections();
@@ -1993,8 +2019,8 @@ function createOneOffTask(name,date,opts={}){
  const visible=tasks.filter(t=>t.type==='recurring'||(t.type==='one-off'&&t.date===date));
  const t={id:uid(),name,order:visible.length+1,type:'one-off',date,priority:!!opts.priority};
  tasks.push(t);taskTypeLedger[t.id]='one-off';taskCreatedLedger[t.id]=date;
- if(opts.note)notes[t.id+'_'+date]=opts.note;
- saveTaskTypeLedger(taskTypeLedger);saveTaskCreatedLedger(taskCreatedLedger);saveTasks(tasks);saveNotes(notes);return t;
+ if(opts.note)notes[t.id+'_'+date]=opts.note;if(Array.isArray(opts.checklist))checklistTemplates[t.id+'_'+date]=opts.checklist.map(x=>({id:uid(),text:x.text||''}));
+ saveTaskTypeLedger(taskTypeLedger);saveTaskCreatedLedger(taskCreatedLedger);saveTasks(tasks);saveNotes(notes);saveChecklistTemplates(checklistTemplates);return t;
 }
 function scheduleBacklogItem(id,date){
  if(!/^\d{4}-\d{2}-\d{2}$/.test(date||'')){alert('Please use YYYY-MM-DD.');return;}
@@ -2172,6 +2198,46 @@ function noteKeyForTask(taskId,dateStr){
   return task && task.type==='recurring' ? taskId + '_recurring' : taskId + '_' + dateStr;
 }
 
+function checklistTemplateKey(taskId,dateStr){
+ const task=tasks.find(t=>t.id===taskId);
+ return task&&task.type==='recurring'?taskId+'_recurring':taskId+'_'+dateStr;
+}
+function checklistCheckKey(taskId,dateStr){return taskId+'_'+dateStr}
+function checklistItemsFor(taskId,dateStr){return checklistTemplates[checklistTemplateKey(taskId,dateStr)]||[]}
+function checklistDoneMap(taskId,dateStr){return checklistChecks[checklistCheckKey(taskId,dateStr)]||{}}
+function renderTaskChecklist(){
+ if(!pickerTarget)return;
+ const {taskId,dateStr}=pickerTarget,items=checklistItemsFor(taskId,dateStr),done=checklistDoneMap(taskId,dateStr);
+ const box=document.getElementById('checklistItems'),summary=document.getElementById('checklistSummary');
+ box.innerHTML='';summary.textContent=Object.values(done).filter(Boolean).filter((_,i)=>true).length+' / '+items.length;
+ // Count only IDs still present in template.
+ const validDone=items.filter(x=>done[x.id]).length;summary.textContent=validDone+' / '+items.length;
+ items.forEach((it,idx)=>{
+   const row=document.createElement('div');row.className='checklist-row';row.draggable=true;row.dataset.itemId=it.id;
+   row.innerHTML=`<span class="checklist-grip">≡</span><input class="checklist-check" type="checkbox" ${done[it.id]?'checked':''}><input class="checklist-text" value="${escHtml(it.text||'')}" aria-label="Checklist item"><button class="checklist-delete" type="button" title="Delete">×</button>`;
+   row.querySelector('.checklist-check').addEventListener('change',e=>{const key=checklistCheckKey(taskId,dateStr),m={...(checklistChecks[key]||{})};if(e.target.checked)m[it.id]=true;else delete m[it.id];checklistChecks[key]=m;saveChecklistChecks(checklistChecks);renderTaskChecklist()});
+   const text=row.querySelector('.checklist-text');
+   text.addEventListener('input',e=>{it.text=e.target.value;saveChecklistTemplates(checklistTemplates)});
+   text.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();document.getElementById('checklistAdd').click()}});
+   row.querySelector('.checklist-delete').addEventListener('click',()=>{const key=checklistTemplateKey(taskId,dateStr);checklistTemplates[key]=(checklistTemplates[key]||[]).filter(x=>x.id!==it.id);const ck=checklistCheckKey(taskId,dateStr);if(checklistChecks[ck])delete checklistChecks[ck][it.id];saveChecklistTemplates(checklistTemplates);saveChecklistChecks(checklistChecks);renderTaskChecklist()});
+   row.addEventListener('dragstart',e=>{if(e.target.closest('input,button')){e.preventDefault();return}e.dataTransfer.setData('text/checklist-item',it.id);e.dataTransfer.effectAllowed='move';row.classList.add('dragging')});
+   row.addEventListener('dragend',()=>row.classList.remove('dragging'));
+   row.addEventListener('dragover',e=>{if(!e.dataTransfer.types.includes('text/checklist-item'))return;e.preventDefault();row.classList.add('checklist-drop')});
+   row.addEventListener('dragleave',()=>row.classList.remove('checklist-drop'));
+   row.addEventListener('drop',e=>{row.classList.remove('checklist-drop');const movingId=e.dataTransfer.getData('text/checklist-item');if(!movingId||movingId===it.id)return;e.preventDefault();const key=checklistTemplateKey(taskId,dateStr),arr=[...(checklistTemplates[key]||[])],from=arr.findIndex(x=>x.id===movingId),to=arr.findIndex(x=>x.id===it.id);if(from<0||to<0)return;const [mv]=arr.splice(from,1);arr.splice(to,0,mv);checklistTemplates[key]=arr;saveChecklistTemplates(checklistTemplates);renderTaskChecklist()});
+   box.appendChild(row);
+ });
+ const body=document.getElementById('checklistBody'),toggle=document.getElementById('checklistToggle');
+ if(items.length&&!toggle.dataset.userToggled){body.classList.add('open');document.getElementById('checklistChevron').textContent='⌃'}
+}
+function addChecklistItem(){
+ if(!pickerTarget)return;
+ const key=checklistTemplateKey(pickerTarget.taskId,pickerTarget.dateStr),arr=checklistTemplates[key]||[];
+ arr.push({id:uid(),text:''});checklistTemplates[key]=arr;saveChecklistTemplates(checklistTemplates);
+ document.getElementById('checklistBody').classList.add('open');document.getElementById('checklistChevron').textContent='⌃';renderTaskChecklist();
+ requestAnimationFrame(()=>{const inputs=document.querySelectorAll('#checklistItems .checklist-text');inputs[inputs.length-1]?.focus()});
+}
+
 function openPicker(e, taskId, dateStr) {
   e.stopPropagation();
   pickerTarget = { taskId, dateStr };
@@ -2183,6 +2249,9 @@ function openPicker(e, taskId, dateStr) {
   if(task.type==='recurring' && notes[notesKey]==null){const legacy=taskId+'_'+dateStr;if(notes[legacy]){notes[notesKey]=notes[legacy];saveNotes(notes);}}
   document.getElementById('taskNotes').value=notes[notesKey]||'';
   autoGrowTaskNotes(document.getElementById('taskNotes'));
+  document.getElementById('checklistToggle').dataset.userToggled='';
+  document.getElementById('checklistBody').classList.remove('open');document.getElementById('checklistChevron').textContent='⌄';
+  renderTaskChecklist();
   document.getElementById('pickerTitle').textContent=task.name;
   document.getElementById('taskTitleEdit').value=task.name;
   document.getElementById('pickerPriority').textContent=task.priority?'★ Priority':'☆ Priority';
@@ -2226,6 +2295,9 @@ document.getElementById('taskNotes').addEventListener('input', (e) => {
   notesSaveTimer = setTimeout(() => saveNotes(notes), 200);
 });
 
+document.getElementById('checklistToggle').addEventListener('click',()=>{const body=document.getElementById('checklistBody'),open=!body.classList.contains('open');body.classList.toggle('open',open);document.getElementById('checklistChevron').textContent=open?'⌃':'⌄';document.getElementById('checklistToggle').dataset.userToggled='1'});
+document.getElementById('checklistAdd').addEventListener('click',addChecklistItem);
+
 function moveOneOffTask(taskId,newDate){
  const t=tasks.find(x=>x.id===taskId);if(!t)return;
  if(t.type!=='one-off'){alert('Date moves apply to one-off tasks. Recurring tasks already appear every day.');return;}
@@ -2250,7 +2322,7 @@ document.getElementById('pickerTomorrow').addEventListener('click',()=>{
  if(!pickerTarget)return;
  const source=tasks.find(x=>x.id===pickerTarget.taskId);if(!source||source.type!=='one-off')return;
  const tomorrow=fmtDate(addDays(new Date(pickerTarget.dateStr+'T12:00:00'),1));
- createOneOffTask(source.name,tomorrow,{priority:!!source.priority,note:notes[noteKeyForTask(source.id,pickerTarget.dateStr)]||''});
+ createOneOffTask(source.name,tomorrow,{priority:!!source.priority,note:notes[noteKeyForTask(source.id,pickerTarget.dateStr)]||'',checklist:checklistItemsFor(source.id,pickerTarget.dateStr)});
  // Deliberately keep the original task, status and date untouched so an unfinished
  // task remains visible on its original day while a fresh copy appears tomorrow.
  closePicker();render();
